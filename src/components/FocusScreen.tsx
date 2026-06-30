@@ -1,0 +1,567 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Play } from 'lucide-react';
+import { useApp } from '../store';
+import { Card, Button } from './ui';
+import { Subject } from '../types';
+import { cn, isBlockTask, getBlockSubtasks, getTaskTypes } from '../utils';
+import { motion, AnimatePresence } from 'motion/react';
+
+const CONFETTI_COLORS = ['#f43f5e', '#a3e635', '#38bdf8', '#fbbf24', '#ec4899', '#a855f7', '#10b981', '#f97316'];
+
+function Confetti({ active }: { active: boolean }) {
+  const particles = React.useMemo(() => {
+    if (!active) return [];
+    return Array.from({ length: 120 }).map((_, i) => {
+      const size = Math.floor(Math.random() * 6) + 6;
+      const left = Math.random() * 100;
+      const delay = Math.random() * 5; // staggered start from 0 to 5 seconds
+      const duration = Math.random() * 2.5 + 3.5; // fall duration of 3.5 to 6 seconds
+      const color = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+      const sway = Math.floor(Math.random() * 140) - 70;
+      const rotStart = Math.floor(Math.random() * 360);
+      const rotEnd = rotStart + Math.floor(Math.random() * 720) + 360;
+      
+      return {
+        id: i,
+        size,
+        left: `${left}%`,
+        delay: `${delay}s`,
+        duration: `${duration}s`,
+        color,
+        sway: `${sway}px`,
+        rotStart: `${rotStart}deg`,
+        rotEnd: `${rotEnd}deg`,
+      };
+    });
+  }, [active]);
+
+  if (!active) return null;
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes confettiFall {
+          0% {
+            transform: translateY(-20px) rotate(var(--rot-start)) translateX(0);
+            opacity: 1;
+          }
+          90% {
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(110vh) rotate(var(--rot-end)) translateX(var(--sway));
+            opacity: 0;
+          }
+        }
+        .confetti-particle {
+          position: absolute;
+          top: -20px;
+          animation: confettiFall var(--dur) linear forwards;
+          animation-delay: var(--delay);
+          will-change: transform, opacity;
+        }
+      `}} />
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        {particles.map((p) => (
+          <div
+            key={p.id}
+            className="confetti-particle"
+            style={{
+              left: p.left,
+              width: `${p.size}px`,
+              height: `${p.size}px`,
+              backgroundColor: p.color,
+              borderRadius: Math.random() > 0.5 ? '2px' : '0px',
+              '--dur': p.duration,
+              '--delay': p.delay,
+              '--sway': p.sway,
+              '--rot-start': p.rotStart,
+              '--rot-end': p.rotEnd,
+            } as React.CSSProperties}
+          />
+        ))}
+      </div>
+    </>
+  );
+}
+
+export function FocusScreen() {
+  const { 
+    state, 
+    activeSession,
+    startSession,
+    pauseSession,
+    resumeSession,
+    addSessionAnswer,
+    saveSessionAnswerComment,
+    finishSession,
+    saveSession,
+    discardSession,
+    setTimerMode,
+    setCompositeCorrectness,
+    addCompositeRoundAnswers
+  } = useApp();
+
+  // Local setup states
+  const [subject, setSubject] = useState<Subject>(activeSession.subject || 'Математика');
+  const [taskType, setTaskType] = useState(activeSession.taskType || 'Задание 1');
+  const [targetInput, setTargetInput] = useState(activeSession.targetInput || '10');
+
+  // Dynamically update available task types when subject changes
+  const availableTaskTypes = React.useMemo(() => {
+    return getTaskTypes(subject);
+  }, [subject]);
+
+  useEffect(() => {
+    if (!availableTaskTypes.includes(taskType)) {
+      setTaskType(availableTaskTypes[0]);
+    }
+  }, [subject, availableTaskTypes, taskType]);
+
+  // Comment overlay states
+  const [showCommentInput, setShowCommentInput] = useState(false);
+  const [commentingAnswerId, setCommentingAnswerId] = useState<string | null>(null);
+  const [currentComment, setCurrentComment] = useState('');
+  const [showConfetti, setShowConfetti] = useState(false);
+  const commentRef = useRef<HTMLDivElement>(null);
+
+  // Pixel shift state for screen burn-in protection
+  const [burnShift, setBurnShift] = useState({ x: 0, y: 0 });
+
+  // Update local setup states if global activeSession is in setup and values change
+  useEffect(() => {
+    if (activeSession.focusState === 'setup') {
+      setSubject(activeSession.subject);
+      setTaskType(activeSession.taskType);
+      setTargetInput(activeSession.targetInput);
+    }
+  }, [activeSession.focusState, activeSession.subject, activeSession.taskType, activeSession.targetInput]);
+
+  useEffect(() => {
+    if (!state.settings.screenBurnProtection || activeSession.focusState !== 'active') {
+      setBurnShift({ x: 0, y: 0 });
+      return;
+    }
+    
+    // Set a subtle initial shift when enabled
+    setBurnShift({ x: 2, y: -2 });
+
+    const interval = setInterval(() => {
+      const sx = Math.floor(Math.random() * 13) - 6; // -6 to 6 px
+      const sy = Math.floor(Math.random() * 13) - 6; // -6 to 6 px
+      setBurnShift({ x: sx, y: sy });
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [state.settings.screenBurnProtection, activeSession.focusState]);
+
+  useEffect(() => {
+    if (!showCommentInput) return;
+    const handleGlobalClick = (e: MouseEvent) => {
+      if (
+        commentRef.current && 
+        !commentRef.current.contains(e.target as Node) &&
+        !(e.target as HTMLElement).closest('.error-btn') &&
+        !(e.target as HTMLElement).closest('.success-btn')
+      ) {
+        setShowCommentInput(false);
+        setCommentingAnswerId(null);
+        setCurrentComment('');
+      }
+    };
+    document.addEventListener('mousedown', handleGlobalClick);
+    return () => document.removeEventListener('mousedown', handleGlobalClick);
+  }, [showCommentInput]);
+
+  const handleStart = () => {
+    setShowConfetti(false);
+    startSession(subject, taskType, targetInput);
+  };
+
+  const handleAnswer = (isCorrect: boolean) => {
+    const newAnswer = addSessionAnswer(isCorrect);
+    
+    if (!isCorrect && !state.settings.hideErrorComments) {
+      setCommentingAnswerId(newAnswer.id);
+      setCurrentComment('');
+      setShowCommentInput(true);
+    } else {
+      setShowCommentInput(false);
+      setCommentingAnswerId(null);
+      setCurrentComment('');
+    }
+  };
+
+  const handleSaveComment = () => {
+    if (commentingAnswerId && currentComment.trim()) {
+      saveSessionAnswerComment(commentingAnswerId, currentComment);
+    }
+    setShowCommentInput(false);
+    setCommentingAnswerId(null);
+    setCurrentComment('');
+  };
+
+  const handleCancelComment = () => {
+    setShowCommentInput(false);
+    setCommentingAnswerId(null);
+    setCurrentComment('');
+  };
+
+  const handleFinish = () => {
+    finishSession();
+  };
+
+  const handleSaveSession = () => {
+    const targetCountVal = parseInt(activeSession.targetInput, 10);
+    const hasTargetVal = !isNaN(targetCountVal) && targetCountVal > 0;
+    const activeCorrectCountVal = activeSession.answers.filter(a => a.isCorrect).length;
+    const isTargetAchieved = hasTargetVal && activeCorrectCountVal >= targetCountVal;
+
+    saveSession();
+
+    if (isTargetAchieved) {
+      setShowConfetti(true);
+      setTimeout(() => {
+        setShowConfetti(false);
+      }, 12000);
+    }
+  };
+
+  const handleDiscardSession = () => {
+    discardSession();
+  };
+
+  const cycleTimerMode = () => {
+    if (activeSession.timerMode === 'default') {
+      setTimerMode('onlyMinutes');
+    } else if (activeSession.timerMode === 'onlyMinutes') {
+      setTimerMode('currentTime');
+    } else {
+      setTimerMode('default');
+    }
+  };
+
+  // Helper to format any seconds amount
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // Live seconds calculation
+  const currentSeconds = activeSession.elapsedSeconds + 
+    (activeSession.startTime ? Math.floor((Date.now() - activeSession.startTime) / 1000) : 0);
+
+  const activeCorrectCount = activeSession.answers.filter(a => a.isCorrect).length;
+  const activeErrorCount = activeSession.answers.filter(a => !a.isCorrect).length;
+
+  const targetCount = parseInt(activeSession.targetInput, 10);
+  const hasTarget = !isNaN(targetCount) && targetCount > 0;
+
+  return (
+    <AnimatePresence mode="wait">
+      {activeSession.focusState === 'setup' && (
+        <motion.div
+          key="setup"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
+          className="flex-1 flex items-center justify-center p-8 relative"
+        >
+          <Confetti active={showConfetti} />
+          <Card className="w-[480px] p-8 md:p-10 shadow-2xl bg-[#111112] relative z-10">
+            <h2 className="text-3xl font-light text-[#fafafa] mb-10 text-center">Новая сессия</h2>
+            
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-[#717171] uppercase tracking-widest text-center block">Предмет</label>
+                <select 
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value as Subject)}
+                  className="w-full bg-[#111112] border border-white/10 text-[#fafafa] text-base rounded-2xl px-5 py-4 outline-none focus:border-white/30 appearance-none transition-all text-center cursor-pointer"
+                  style={{ textAlignLast: 'center' }}
+                >
+                  {state.settings.activeSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-[#717171] uppercase tracking-widest text-center block">Тип заданий</label>
+                <select 
+                  value={taskType}
+                  onChange={(e) => setTaskType(e.target.value)}
+                  className="w-full bg-[#111112] border border-white/10 text-[#fafafa] text-base rounded-2xl px-5 py-4 outline-none focus:border-white/30 appearance-none transition-all text-center cursor-pointer"
+                  style={{ textAlignLast: 'center' }}
+                >
+                  {availableTaskTypes.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-[#717171] uppercase tracking-widest text-center block">Цель</label>
+                <input 
+                  type="text" 
+                  value={targetInput}
+                  onChange={(e) => setTargetInput(e.target.value)}
+                  placeholder="Без ограничений"
+                  className="w-full bg-[#111112] border border-white/10 text-[#fafafa] text-base rounded-2xl px-5 py-4 outline-none focus:border-white/30 transition-all text-center"
+                />
+              </div>
+
+              <Button variant="white" onClick={handleStart} className="w-full py-4.5 text-lg mt-6 font-semibold rounded-full shadow-[0_4px_25px_rgba(255,255,255,0.12)]">
+                <Play size={20} fill="currentColor" />
+                НАЧАТЬ
+              </Button>
+            </div>
+          </Card>
+        </motion.div>
+      )}
+
+      {activeSession.focusState === 'active' && (() => {
+        const m = Math.floor(currentSeconds / 60);
+        const s = currentSeconds % 60;
+        const mStr = m.toString().padStart(2, '0');
+        const sStr = s.toString().padStart(2, '0');
+
+        return (
+          <motion.div
+            key="active"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className="flex-1 flex flex-col items-center justify-center p-8 relative w-full h-full"
+          >
+            <div
+              style={{
+                transform: `translate(${burnShift.x}px, ${burnShift.y}px)`,
+                transition: 'transform 1s ease-in-out'
+              }}
+              className="flex-1 flex flex-col items-center justify-center w-full h-full"
+            >
+              <div className="flex flex-col items-center max-w-md w-full">
+                {!state.settings.hideTaskMarkers && (
+                  <div className="text-xs font-semibold text-[#717171] uppercase tracking-widest mb-6 select-none">
+                    {activeSession.subject} • {activeSession.taskType}
+                  </div>
+                )}
+                
+                {!state.settings.hideTimer && (
+                  <button 
+                    onClick={cycleTimerMode}
+                    className="text-[120px] leading-none font-sans font-extralight text-[#fafafa] tracking-tight mb-8 tabular-nums flex items-center justify-center select-none cursor-pointer hover:opacity-85 active:scale-98 transition-all"
+                  >
+                    {activeSession.timerMode === 'onlyMinutes' ? (
+                      <span>{mStr}</span>
+                    ) : activeSession.timerMode === 'currentTime' ? (() => {
+                      const now = new Date();
+                      const hours = now.getHours();
+                      const mins = now.getMinutes().toString().padStart(2, '0');
+                      return (
+                        <>
+                          <span>{hours}</span>
+                          <span className="text-[#fafafa]/40 px-2 flex items-center justify-center relative -top-[12px] font-sans select-none">:</span>
+                          <span>{mins}</span>
+                        </>
+                      );
+                    })() : (
+                      <>
+                        <span>{mStr}</span>
+                        <span className="text-[#fafafa]/40 px-2 flex items-center justify-center relative -top-[12px] font-sans select-none">:</span>
+                        <span>{sStr}</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Hide task circles when hideTaskMarkers setting is enabled */}
+                {!state.settings.hideTaskMarkers && (
+                  <div className="w-full overflow-hidden flex justify-center mb-12 h-3 px-2">
+                    <div className="flex gap-2 justify-center items-center max-w-full">
+                      {activeSession.answers.slice(-16).map((a, i) => (
+                        <motion.div 
+                          key={a.id || i} 
+                          initial={{ scale: 0, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                          className={`w-3 h-3 rounded-full shrink-0 ${a.isCorrect ? 'bg-[#a3e635]' : 'bg-[#f43f5e]'}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Progress bar line matched precisely to screenshot */}
+                {hasTarget && (
+                  <div className="w-full mb-6">
+                    <div className="flex justify-end text-xs font-mono text-[#717171] mb-2 select-none">
+                      {activeCorrectCount} / {targetCount}
+                    </div>
+                    <div className="w-full h-[2px] bg-white/10 rounded-full overflow-hidden">
+                      <motion.div 
+                        className="h-full bg-white/60 rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(100, (activeCorrectCount / targetCount) * 100)}%` }}
+                        transition={{ duration: 0.2 }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Relative container for non-shifting layouts */}
+                <div className="w-full relative mb-16">
+                  {isBlockTask(activeSession.subject, activeSession.taskType) ? (
+                    <div className="space-y-5 w-full">
+                      <div className="bg-[#121214] border border-white/5 rounded-2xl p-5 space-y-4 shadow-xl">
+                        {getBlockSubtasks(activeSession.subject, activeSession.taskType).map((subtask) => {
+                          const isCorrect = activeSession.compositeCorrectness?.[subtask];
+                          
+                          return (
+                            <div key={subtask} className="flex items-center justify-between py-2 border-b border-white/[0.03] last:border-0">
+                              <span className="text-sm font-semibold text-[#fafafa]">{subtask}</span>
+                              <div className="flex gap-2.5">
+                                <button
+                                  onClick={() => setCompositeCorrectness(subtask, isCorrect === true ? null : true)}
+                                  className={cn(
+                                    "w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer font-bold border text-lg",
+                                    isCorrect === true
+                                      ? "bg-[#a3e635]/15 text-[#a3e635] border-[#a3e635]/30 shadow-[0_0_15px_rgba(163,230,53,0.15)]"
+                                      : "bg-white/5 text-[#717171] border-transparent hover:text-white"
+                                  )}
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  onClick={() => setCompositeCorrectness(subtask, isCorrect === false ? null : false)}
+                                  className={cn(
+                                    "w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer font-bold border text-lg",
+                                    isCorrect === false
+                                      ? "bg-[#f43f5e]/15 text-[#f43f5e] border-[#f43f5e]/30 shadow-[0_0_15px_rgba(244,63,94,0.15)]"
+                                      : "bg-white/5 text-[#717171] border-transparent hover:text-white"
+                                  )}
+                                >
+                                  X
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <Button 
+                        variant="white" 
+                        onClick={addCompositeRoundAnswers} 
+                        className="w-full py-4 text-base font-semibold rounded-full shadow-[0_4px_20px_rgba(255,255,255,0.12)]"
+                      >
+                        ГОТОВО
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-3 w-full">
+                        <button 
+                          onClick={() => handleAnswer(true)}
+                          className="success-btn w-full bg-[#a3e635]/10 border border-[#a3e635]/30 hover:border-[#a3e635] hover:bg-[#a3e635]/20 text-[#fafafa] py-4 px-6 rounded-2xl flex items-center justify-between transition-all cursor-pointer"
+                        >
+                          <span className="text-sm font-medium tracking-wider">ВЕРНО</span>
+                          <span className="text-lg font-mono">{activeCorrectCount}</span>
+                        </button>
+                        
+                        <button 
+                          onClick={() => handleAnswer(false)}
+                          className="error-btn w-full bg-[#f43f5e]/10 border border-[#f43f5e]/30 hover:border-[#f43f5e] hover:bg-[#f43f5e]/20 text-[#fafafa] py-4 px-6 rounded-2xl flex items-center justify-between transition-all cursor-pointer"
+                        >
+                          <span className="text-sm font-medium tracking-wider">ОШИБКА</span>
+                          <span className="text-lg font-mono">{activeErrorCount}</span>
+                        </button>
+                      </div>
+
+                      {/* Absolute overlay for error notes */}
+                      <AnimatePresence>
+                        {showCommentInput && (
+                          <motion.div 
+                            ref={commentRef}
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            transition={{ duration: 0.15, ease: 'easeOut' }}
+                            className="absolute top-[calc(100%+16px)] left-0 right-0 z-30"
+                          >
+                            <div className="p-4 bg-[#111112] border border-white/10 rounded-2xl flex flex-col gap-3 shadow-2xl shadow-black/80">
+                              <input
+                                autoFocus
+                                type="text"
+                                placeholder="Заметка к ошибке..."
+                                value={currentComment}
+                                onChange={e => setCurrentComment(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleSaveComment()}
+                                className="w-full bg-transparent text-[#fafafa] outline-none text-sm placeholder:text-[#555]"
+                              />
+                              <div className="flex justify-end gap-2">
+                                <Button variant="ghost" className="px-3 py-1.5 text-xs rounded-lg" onClick={handleCancelComment}>Отмена</Button>
+                                <Button variant="secondary" className="px-3 py-1.5 text-xs rounded-lg" onClick={handleSaveComment}>Сохранить</Button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="absolute bottom-12 left-0 right-0 flex justify-center">
+                <button 
+                  onClick={handleFinish}
+                  className="text-xs font-medium text-[#717171] hover:text-[#fafafa] uppercase tracking-widest transition-colors cursor-pointer"
+                >
+                  ЗАВЕРШИТЬ
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        );
+      })()}
+
+      {activeSession.focusState === 'results' && (
+        <motion.div
+          key="results"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
+          className="flex-1 flex items-center justify-center p-8 relative"
+        >
+          <div className="absolute inset-0 bg-[#090911]/80 backdrop-blur-sm z-0" />
+          <Card className="w-[440px] p-8 md:p-10 z-10 shadow-2xl bg-[#111112]">
+            <h2 className="text-3xl font-light text-[#fafafa] mb-10 text-center">Итоги сессии</h2>
+            
+            <div className="space-y-4 mb-10">
+              <div className="flex justify-between items-center py-3 border-b border-white/5">
+                <span className="text-base text-[#717171]">Время</span>
+                <span className="text-base font-mono text-[#fafafa]">{formatTime(currentSeconds)}</span>
+              </div>
+              
+              <div className="flex justify-between items-center py-3 border-b border-white/5">
+                <span className="text-base text-[#717171]">Верно</span>
+                <span className="text-base font-mono text-[#fafafa]">{activeCorrectCount}</span>
+              </div>
+              <div className="flex justify-between items-center py-3 border-b border-white/5">
+                <span className="text-base text-[#717171]">Ошибки</span>
+                <span className="text-base font-mono text-[#fafafa]">{activeErrorCount}</span>
+              </div>
+            </div>
+
+            <div className="space-y-3.5">
+              <Button variant="white" onClick={handleSaveSession} className="w-full py-4 text-base font-semibold rounded-full shadow-[0_4px_20px_rgba(255,255,255,0.12)]">СОХРАНИТЬ</Button>
+              <Button variant="secondary" onClick={resumeSession} className="w-full py-4 text-base rounded-full">Продолжить</Button>
+              <Button variant="ghost" onClick={handleDiscardSession} className="w-full py-4 text-base rounded-full">Не сохранять</Button>
+            </div>
+          </Card>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
