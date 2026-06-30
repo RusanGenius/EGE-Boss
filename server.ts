@@ -1,6 +1,6 @@
 import path from "path";
 import express from "express";
-import app from "./src/server-api";
+import app from "./api/index";
 
 // Setup function for Vite and Static asset serving
 async function setupVite() {
