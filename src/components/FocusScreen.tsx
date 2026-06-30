@@ -534,7 +534,7 @@ export function FocusScreen() {
           transition={{ duration: 0.15, ease: 'easeOut' }}
           className="flex-1 flex items-center justify-center p-8 relative"
         >
-          <div className="absolute inset-0 bg-[#090911]/80 backdrop-blur-sm z-0" />
+          <div className="absolute inset-0 bg-[#090909]/80 backdrop-blur-sm z-0" />
           <Card className="w-[440px] p-8 md:p-10 z-10 shadow-2xl bg-[#111112]">
             <h2 className="text-3xl font-light text-[#fafafa] mb-10 text-center">Итоги сессии</h2>
             

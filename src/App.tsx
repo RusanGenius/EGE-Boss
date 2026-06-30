@@ -20,11 +20,11 @@ export default function App() {
   const isMonochrome = state.settings.theme === 'monochrome';
 
   return (
-    <div className={`flex flex-col md:flex-row h-screen w-full bg-[#090911] text-[#fafafa] overflow-hidden font-sans ${isMonochrome ? 'selection:bg-white selection:text-[#090911]' : 'selection:bg-[#a3e635] selection:text-[#090911]'}`}>
+    <div className={`flex flex-col md:flex-row h-screen w-full bg-[#090909] text-[#fafafa] overflow-hidden font-sans ${isMonochrome ? 'selection:bg-white selection:text-[#090909]' : 'selection:bg-[#a3e635] selection:text-[#090909]'}`}>
       <AchievementNotifier />
       <RusanEasterEgg />
       <Sidebar />
-      <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#090911] pb-16 md:pb-0">
+      <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#090909] pb-16 md:pb-0">
         <AnimatePresence mode="wait">
           {state.activeTab === 'focus' && (
             <motion.div

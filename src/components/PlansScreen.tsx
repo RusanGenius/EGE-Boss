@@ -220,7 +220,7 @@ export function PlansScreen() {
                   <select
                     value={subject}
                     onChange={(e) => setSubject(e.target.value as Subject)}
-                    className="w-full bg-[#090911] border border-white/10 rounded-xl py-2.5 px-3 text-[#fafafa] focus:border-white/30 focus:outline-none text-sm cursor-pointer"
+                    className="w-full bg-[#090909] border border-white/10 rounded-xl py-2.5 px-3 text-[#fafafa] focus:border-white/30 focus:outline-none text-sm cursor-pointer"
                   >
                     {state.settings.activeSubjects.map(subj => (
                       <option key={subj} value={subj}>
@@ -237,7 +237,7 @@ export function PlansScreen() {
                   <select
                     value={taskType}
                     onChange={(e) => setTaskType(e.target.value)}
-                    className="w-full bg-[#090911] border border-white/10 rounded-xl py-2.5 px-3 text-[#fafafa] focus:border-white/30 focus:outline-none text-sm cursor-pointer"
+                    className="w-full bg-[#090909] border border-white/10 rounded-xl py-2.5 px-3 text-[#fafafa] focus:border-white/30 focus:outline-none text-sm cursor-pointer"
                   >
                     {availableTasks.map(task => (
                       <option key={task} value={task}>
@@ -257,7 +257,7 @@ export function PlansScreen() {
                     value={targetTasks}
                     onChange={(e) => setTargetTasks(e.target.value)}
                     placeholder="Например, 10"
-                    className={`w-full bg-[#090911] border border-white/10 rounded-xl py-2.5 px-3 text-[#fafafa] focus:outline-none text-sm font-mono ${isMonochrome ? 'focus:border-white/40' : 'focus:border-[#a3e635]'}`}
+                    className={`w-full bg-[#090909] border border-white/10 rounded-xl py-2.5 px-3 text-[#fafafa] focus:outline-none text-sm font-mono ${isMonochrome ? 'focus:border-white/40' : 'focus:border-[#a3e635]'}`}
                   />
                 </div>
 
@@ -279,7 +279,7 @@ export function PlansScreen() {
                   <Button
                     type="submit"
                     variant="white"
-                    className={`flex-1 ${isMonochrome ? 'bg-white hover:bg-zinc-200 text-[#090911]' : 'bg-[#a3e635] hover:bg-[#bbf246] text-[#090911]'} border-none font-bold`}
+                    className={`flex-1 ${isMonochrome ? 'bg-white hover:bg-zinc-200 text-[#090909]' : 'bg-[#a3e635] hover:bg-[#bbf246] text-[#090909]'} border-none font-bold`}
                   >
                     Создать
                   </Button>

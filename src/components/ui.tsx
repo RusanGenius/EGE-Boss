@@ -15,12 +15,12 @@ export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttrib
     
     const variants = {
       primary: isMonochrome 
-        ? "bg-[#fafafa] text-[#090911] hover:bg-[#e4e4e7] font-semibold"
-        : "bg-[#a3e635] text-[#090911] hover:bg-[#84cc16] font-semibold",
+        ? "bg-[#fafafa] text-[#090909] hover:bg-[#e4e4e7] font-semibold"
+        : "bg-[#a3e635] text-[#090909] hover:bg-[#84cc16] font-semibold",
       secondary: "bg-[#1c1c1c] text-[#fafafa] hover:bg-[#2a2a2a] border border-white/5",
       danger: "bg-transparent border border-[#f43f5e]/30 text-[#f43f5e] hover:bg-[#f43f5e]/10",
       ghost: "bg-transparent text-[#717171] hover:text-[#fafafa] hover:bg-white/5",
-      white: "bg-white text-[#090911] hover:bg-[#e4e4e7] font-semibold focus:ring-white/50"
+      white: "bg-white text-[#090909] hover:bg-[#e4e4e7] font-semibold focus:ring-white/50"
     };
     
     return (

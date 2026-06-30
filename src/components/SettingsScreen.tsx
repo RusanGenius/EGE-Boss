@@ -223,7 +223,7 @@ export function SettingsScreen() {
                     setInputCode(val);
                   }
                 }}
-                className={`w-full max-w-[200px] text-center text-3xl font-mono tracking-widest bg-[#090911] border border-white/10 rounded-xl py-3 px-4 text-[#fafafa] ${isMonochrome ? 'focus:border-white/55' : 'focus:border-[#a3e635]'} focus:outline-none mb-6`}
+                className={`w-full max-w-[200px] text-center text-3xl font-mono tracking-widest bg-[#090909] border border-white/10 rounded-xl py-3 px-4 text-[#fafafa] ${isMonochrome ? 'focus:border-white/55' : 'focus:border-[#a3e635]'} focus:outline-none mb-6`}
               />
 
               {syncError && (
@@ -249,7 +249,7 @@ export function SettingsScreen() {
                 Данные успешно загружены! Пожалуйста, подтвердите замену текущих данных на этом устройстве.
               </p>
 
-              <div className="bg-[#090911] border border-white/5 rounded-xl p-4 mb-6 space-y-2 font-mono text-xs text-[#717171]">
+              <div className="bg-[#090909] border border-white/5 rounded-xl p-4 mb-6 space-y-2 font-mono text-xs text-[#717171]">
                 <div className="flex justify-between">
                   <span>Выполненные сессии:</span>
                   <span className="text-[#fafafa] font-bold">{(loadedData.sessions || []).length}</span>

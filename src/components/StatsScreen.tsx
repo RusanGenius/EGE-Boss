@@ -31,7 +31,7 @@ export function StatsScreen() {
   const [activeTab, setActiveTab] = useState<'overview' | 'achievements' | 'mocks' | 'tasks'>('overview');
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#090911]">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#090909]">
       <header className="p-4 md:p-6 pb-0 flex flex-col border-b border-white/5 shrink-0">
         {/* Sleek Minimalist Tabs */}
         <div className="flex gap-6 md:gap-8 overflow-x-auto scrollbar-none justify-center">
@@ -550,7 +550,7 @@ function OverviewTab() {
               <button 
                 key={s} 
                 onClick={() => setSubject(s)}
-                className={`px-4 py-1.5 rounded-lg text-xs font-semibold relative transition-colors shrink-0 focus:outline-none outline-none select-none ${isActive ? 'text-[#090911]' : 'text-[#717171] hover:text-[#fafafa]'}`}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold relative transition-colors shrink-0 focus:outline-none outline-none select-none ${isActive ? 'text-[#090909]' : 'text-[#717171] hover:text-[#fafafa]'}`}
               >
                 <span className="relative z-10">{s}</span>
                 {isActive && (
@@ -573,7 +573,7 @@ function OverviewTab() {
               <button 
                 key={t}
                 onClick={() => setTimeRange(t)}
-                className={`px-4 py-1.5 rounded-lg text-xs font-semibold relative transition-colors shrink-0 focus:outline-none outline-none select-none ${isActive ? 'text-[#090911]' : 'text-[#717171] hover:text-[#fafafa]'}`}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold relative transition-colors shrink-0 focus:outline-none outline-none select-none ${isActive ? 'text-[#090909]' : 'text-[#717171] hover:text-[#fafafa]'}`}
               >
                 <span className="relative z-10">{t}</span>
                 {isActive && (
@@ -639,7 +639,7 @@ function OverviewTab() {
                 onClick={() => setActivityTimeRange(tab)}
                 className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-all duration-200 cursor-pointer ${
                   activityTimeRange === tab
-                    ? 'bg-white text-[#090911] shadow-md'
+                    ? 'bg-white text-[#090909] shadow-md'
                     : 'text-[#717171] hover:text-[#fafafa]'
                 }`}
               >
@@ -684,7 +684,7 @@ function OverviewTab() {
                 dataKey="value" 
                 stroke={accentColor} 
                 strokeWidth={3} 
-                dot={{ fill: accentColor, stroke: '#090911', strokeWidth: 1.5, r: 4.5 }} 
+                dot={{ fill: accentColor, stroke: '#090909', strokeWidth: 1.5, r: 4.5 }} 
                 activeDot={{ r: 6, fill: '#fafafa', stroke: accentColor, strokeWidth: 2 }} 
                 animationDuration={350} 
               />
@@ -740,14 +740,14 @@ function OverviewTab() {
                           'bg-[#121214] text-[#444448] hover:bg-[#18181a]',
                           'bg-white/10 text-white hover:bg-white/20',
                           'bg-white/25 text-white hover:bg-white/35',
-                          'bg-white/50 text-[#090911] font-semibold hover:bg-white/60',
-                          'bg-white text-[#090911] font-bold hover:bg-zinc-200'
+                          'bg-white/50 text-[#090909] font-semibold hover:bg-white/60',
+                          'bg-white text-[#090909] font-bold hover:bg-zinc-200'
                         ] : [
                           'bg-[#121214] text-[#444448] hover:bg-[#18181a]',
                           'bg-[#a3e635]/15 text-[#a3e635] hover:bg-[#a3e635]/25',
                           'bg-[#a3e635]/35 text-[#fafafa] hover:bg-[#a3e635]/45',
-                          'bg-[#a3e635]/65 text-[#090911] font-semibold hover:bg-[#a3e635]/75',
-                          'bg-[#a3e635] text-[#090911] font-bold hover:bg-[#bbf255]'
+                          'bg-[#a3e635]/65 text-[#090909] font-semibold hover:bg-[#a3e635]/75',
+                          'bg-[#a3e635] text-[#090909] font-bold hover:bg-[#bbf255]'
                         ];
 
                         return (
@@ -823,7 +823,7 @@ function OverviewTab() {
                       transition={{ duration: 0.15, ease: 'easeOut' }}
                       className="h-full bg-white rounded-md flex items-center pl-3 min-w-[65px]"
                     >
-                      <span className="text-[11px] font-extrabold text-[#090911] font-mono whitespace-nowrap">
+                      <span className="text-[11px] font-extrabold text-[#090909] font-mono whitespace-nowrap">
                         {streak.daysCount} {streak.daysCount % 10 === 1 && streak.daysCount % 100 !== 11 ? 'день' : [2, 3, 4].includes(streak.daysCount % 10) && ![12, 13, 14].includes(streak.daysCount % 100) ? 'дня' : 'дней'}
                       </span>
                     </motion.div>
@@ -1158,7 +1158,7 @@ function TasksTab() {
               <button 
                 key={s} 
                 onClick={() => setSubject(s)}
-                className={`px-4 py-1.5 rounded-lg text-xs font-semibold relative transition-colors shrink-0 focus:outline-none outline-none select-none ${isActive ? 'text-[#090911]' : 'text-[#717171] hover:text-[#fafafa]'}`}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold relative transition-colors shrink-0 focus:outline-none outline-none select-none ${isActive ? 'text-[#090909]' : 'text-[#717171] hover:text-[#fafafa]'}`}
               >
                 <span className="relative z-10">{s}</span>
                 {isActive && (
@@ -1256,7 +1256,7 @@ function MocksTab() {
               <button 
                 key={s} 
                 onClick={() => setSelectedSubject(s)}
-                className={`px-4 py-1.5 rounded-lg text-xs font-semibold relative transition-colors shrink-0 focus:outline-none outline-none select-none ${isActive ? 'text-[#090911]' : 'text-[#717171] hover:text-[#fafafa]'}`}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold relative transition-colors shrink-0 focus:outline-none outline-none select-none ${isActive ? 'text-[#090909]' : 'text-[#717171] hover:text-[#fafafa]'}`}
               >
                 <span className="relative z-10">{s}</span>
                 {isActive && (
@@ -1299,14 +1299,14 @@ function MocksTab() {
                   <button
                     type="button"
                     onClick={() => setIsCustomDate(false)}
-                    className={`py-2 rounded-lg text-xs font-semibold transition-all select-none cursor-pointer ${!isCustomDate ? 'bg-[#fafafa] text-[#090911]' : 'text-[#717171] hover:text-[#fafafa]'}`}
+                    className={`py-2 rounded-lg text-xs font-semibold transition-all select-none cursor-pointer ${!isCustomDate ? 'bg-[#fafafa] text-[#090909]' : 'text-[#717171] hover:text-[#fafafa]'}`}
                   >
                     Сегодня
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsCustomDate(true)}
-                    className={`py-2 rounded-lg text-xs font-semibold transition-all select-none cursor-pointer ${isCustomDate ? 'bg-[#fafafa] text-[#090911]' : 'text-[#717171] hover:text-[#fafafa]'}`}
+                    className={`py-2 rounded-lg text-xs font-semibold transition-all select-none cursor-pointer ${isCustomDate ? 'bg-[#fafafa] text-[#090909]' : 'text-[#717171] hover:text-[#fafafa]'}`}
                   >
                     Другая дата
                   </button>
@@ -1327,7 +1327,7 @@ function MocksTab() {
 
               <button 
                 type="submit"
-                className="w-full bg-[#fafafa] hover:bg-[#eaeaea] text-[#090911] font-semibold py-3 px-4 rounded-xl text-sm transition-all shadow-[0_4px_15px_rgba(255,255,255,0.06)] cursor-pointer flex items-center justify-center gap-2"
+                className="w-full bg-[#fafafa] hover:bg-[#eaeaea] text-[#090909] font-semibold py-3 px-4 rounded-xl text-sm transition-all shadow-[0_4px_15px_rgba(255,255,255,0.06)] cursor-pointer flex items-center justify-center gap-2"
               >
                 Сохранить результат
               </button>
@@ -1377,7 +1377,7 @@ function MocksTab() {
                       name="Балл"
                       stroke={accentColor} 
                       strokeWidth={3} 
-                      dot={{ fill: accentColor, stroke: '#090911', strokeWidth: 2, r: 4 }} 
+                      dot={{ fill: accentColor, stroke: '#090909', strokeWidth: 2, r: 4 }} 
                       activeDot={{ r: 6, fill: accentColor, stroke: '#fafafa', strokeWidth: 2 }}
                       animationDuration={350}
                     />
@@ -1570,7 +1570,7 @@ export function AchievementsTab() {
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold relative transition-all shrink-0 focus:outline-none outline-none select-none ${isActive ? 'text-[#090911]' : 'text-[#717171] hover:text-[#fafafa]'}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold relative transition-all shrink-0 focus:outline-none outline-none select-none ${isActive ? 'text-[#090909]' : 'text-[#717171] hover:text-[#fafafa]'}`}
                 >
                   <span className="relative z-10">{cat}</span>
                   {isActive && (
