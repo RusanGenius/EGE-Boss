@@ -36,6 +36,7 @@ export interface Settings {
   syncCode: string;
   syncCodeCreatedAt?: number;
   theme?: 'green' | 'monochrome';
+  timerMode: TimerModeType;
 }
 
 export type TimerModeType = 'default' | 'onlyMinutes' | 'currentTime';
@@ -48,7 +49,6 @@ export interface ActiveSession {
   elapsedSeconds: number;
   startTime: number | null;
   answers: Answer[];
-  timerMode: TimerModeType;
   compositeCorrectness?: { [taskType: string]: boolean | null };
 }
 

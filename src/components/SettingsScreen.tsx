@@ -1,9 +1,10 @@
 import React from 'react';
 import { useApp } from '../store';
 import { Card, Button, Switch } from './ui';
-import { Subject } from '../types';
+import { Subject, TimerModeType } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { Download, Upload, Trash2, Clock, MessageSquareOff, CheckSquare, Shield, Monitor } from 'lucide-react';
 
 export function SettingsScreen() {
   const { state, updateSettings, resetData, importData } = useApp();
@@ -309,6 +310,7 @@ export function SettingsScreen() {
                   : 'bg-[#1c1c1c] border-white/5 text-[#717171] hover:border-white/10 hover:text-[#fafafa]'
               }`}
             >
+              <div className="w-3 h-3 rounded-full bg-[#a3e635] shadow-[0_0_8px_rgba(163,230,53,0.5)]" />
               Лайм
             </button>
             <button
@@ -319,8 +321,32 @@ export function SettingsScreen() {
                   : 'bg-[#1c1c1c] border-white/5 text-[#717171] hover:border-white/10 hover:text-[#fafafa]'
               }`}
             >
+              <div className="w-3 h-3 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.5)]" />
               Монохром
             </button>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="text-[10px] text-[#717171] uppercase tracking-widest mb-4">Формат таймера</div>
+          <div className="flex gap-3">
+            {[
+              { id: 'default', label: 'По умолчанию' },
+              { id: 'onlyMinutes', label: 'Только минуты' },
+              { id: 'currentTime', label: 'Текущее время' },
+            ].map(t => (
+              <button
+                key={t.id}
+                onClick={() => updateSettings({ timerMode: t.id as TimerModeType })}
+                className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 border flex-1 justify-center ${
+                  state.settings.timerMode === t.id
+                    ? (isMonochrome ? 'bg-white/5 border-white/40 text-[#fafafa]' : 'bg-[#a3e635]/10 border-[#a3e635]/50 text-[#a3e635]')
+                    : 'bg-[#1c1c1c] border-white/5 text-[#717171] hover:border-white/10 hover:text-[#fafafa]'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -329,27 +355,44 @@ export function SettingsScreen() {
           
           <div className="space-y-2">
             {[
-              { id: 'hideTimer', label: 'Скрыть таймер' },
-              { id: 'hideErrorComments', label: 'Скрыть комментарии к ошибкам' },
-              { id: 'hideTaskMarkers', label: 'Скрыть маркеры заданий' },
-              { id: 'screenBurnProtection', label: 'Защита от выгорания' },
-            ].map(setting => (
-              <div key={setting.id} className="flex justify-between items-center py-3 border-b border-white/5 last:border-0">
-                <span className="text-sm text-[#fafafa]">{setting.label}</span>
-                <Switch 
-                  checked={(state.settings as any)[setting.id]} 
-                  onChange={(c) => updateSettings({ [setting.id]: c })} 
-                />
-              </div>
-            ))}
+              { id: 'hideTimer', label: 'Скрыть таймер', icon: Clock },
+              { id: 'hideErrorComments', label: 'Скрыть комментарии к ошибкам', icon: MessageSquareOff },
+              { id: 'hideTaskMarkers', label: 'Скрыть маркеры заданий', icon: CheckSquare },
+              { id: 'screenBurnProtection', label: 'Защита от выгорания', icon: Shield },
+            ].map(setting => {
+              const Icon = setting.icon;
+              return (
+                <div key={setting.id} className="flex justify-between items-center py-3 border-b border-white/5 last:border-0">
+                  <div className="flex items-center gap-3">
+                    <Icon size={16} className="text-[#717171]" />
+                    <span className="text-sm text-[#fafafa]">{setting.label}</span>
+                  </div>
+                  <Switch 
+                    checked={(state.settings as any)[setting.id]} 
+                    onChange={(c) => updateSettings({ [setting.id]: c })} 
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
 
         <div className="space-y-4">
           <div className="text-[10px] text-[#717171] uppercase tracking-widest mb-4">Данные</div>
-          <div className="flex gap-4">
-            <Button variant="secondary" onClick={handleExport} className="text-sm">Экспортировать JSON</Button>
-            <Button variant="secondary" onClick={handleImportClick} className="text-sm">Импортировать</Button>
+          <div className="flex flex-wrap gap-4">
+            <Button variant="secondary" onClick={handleExport} className="text-sm flex items-center gap-2">
+              <Download size={16} /> Экспортировать JSON
+            </Button>
+            <Button variant="secondary" onClick={handleImportClick} className="text-sm flex items-center gap-2">
+              <Upload size={16} /> Импортировать
+            </Button>
+            <Button 
+              variant="danger" 
+              onClick={() => setShowResetModal(true)} 
+              className="text-sm border-none bg-[#2a1414] text-[#f43f5e] hover:bg-[#3a1a1a] flex items-center gap-2"
+            >
+              <Trash2 size={16} /> Стереть все данные
+            </Button>
           </div>
           <input 
             type="file" 
@@ -370,16 +413,6 @@ export function SettingsScreen() {
               {errorText}
             </div>
           )}
-
-          <div className="pt-4">
-            <Button 
-              variant="danger" 
-              onClick={() => setShowResetModal(true)} 
-              className="text-sm border-none bg-[#2a1414] text-[#f43f5e] hover:bg-[#3a1a1a]"
-            >
-              Стереть все данные
-            </Button>
-          </div>
         </div>
 
         {/* Custom Reset Confirmation Modal */}

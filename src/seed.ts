@@ -12,7 +12,8 @@ export const INITIAL_STATE: AppState = {
     activeSubjects: ['Математика', 'Русский язык', 'Информатика', 'Физика'],
     syncCode: '------',
     syncCodeCreatedAt: undefined,
-    theme: 'green'
+    theme: 'green',
+    timerMode: 'default'
   },
   activeTab: 'focus'
 };

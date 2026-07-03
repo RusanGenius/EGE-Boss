@@ -97,7 +97,6 @@ export function FocusScreen() {
     finishSession,
     saveSession,
     discardSession,
-    setTimerMode,
     setCompositeCorrectness,
     addCompositeRoundAnswers
   } = useApp();
@@ -230,16 +229,6 @@ export function FocusScreen() {
     discardSession();
   };
 
-  const cycleTimerMode = () => {
-    if (activeSession.timerMode === 'default') {
-      setTimerMode('onlyMinutes');
-    } else if (activeSession.timerMode === 'onlyMinutes') {
-      setTimerMode('currentTime');
-    } else {
-      setTimerMode('default');
-    }
-  };
-
   // Helper to format any seconds amount
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -350,26 +339,41 @@ export function FocusScreen() {
                 
                 {!state.settings.hideTimer && (
                   <button 
-                    onClick={cycleTimerMode}
-                    className="text-[120px] leading-none font-sans font-extralight text-[#fafafa] tracking-tight mb-8 tabular-nums flex items-center justify-center select-none cursor-pointer hover:opacity-85 active:scale-98 transition-all"
+                    onClick={() => {
+                      if (activeSession.startTime === null) {
+                        resumeSession();
+                      } else {
+                        pauseSession();
+                      }
+                    }}
+                    className={cn(
+                      "text-[120px] leading-none font-sans font-extralight tracking-tight mb-8 tabular-nums flex items-center justify-center select-none cursor-pointer hover:opacity-85 active:scale-98 transition-all",
+                      activeSession.startTime === null ? "text-[#fafafa]/50 animate-pulse" : "text-[#fafafa]"
+                    )}
                   >
-                    {activeSession.timerMode === 'onlyMinutes' ? (
+                    {state.settings.timerMode === 'onlyMinutes' ? (
                       <span>{mStr}</span>
-                    ) : activeSession.timerMode === 'currentTime' ? (() => {
+                    ) : state.settings.timerMode === 'currentTime' ? (() => {
                       const now = new Date();
                       const hours = now.getHours();
                       const mins = now.getMinutes().toString().padStart(2, '0');
                       return (
                         <>
                           <span>{hours}</span>
-                          <span className="text-[#fafafa]/40 px-2 flex items-center justify-center relative -top-[12px] font-sans select-none">:</span>
+                          <span className={cn(
+                            "px-2 flex items-center justify-center relative -top-[12px] font-sans select-none",
+                            activeSession.startTime === null ? "text-[#fafafa]/20" : "text-[#fafafa]/40"
+                          )}>:</span>
                           <span>{mins}</span>
                         </>
                       );
                     })() : (
                       <>
                         <span>{mStr}</span>
-                        <span className="text-[#fafafa]/40 px-2 flex items-center justify-center relative -top-[12px] font-sans select-none">:</span>
+                        <span className={cn(
+                          "px-2 flex items-center justify-center relative -top-[12px] font-sans select-none",
+                          activeSession.startTime === null ? "text-[#fafafa]/20" : "text-[#fafafa]/40"
+                        )}>:</span>
                         <span>{sStr}</span>
                       </>
                     )}

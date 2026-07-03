@@ -16,12 +16,23 @@ export const BLOCKS_CONFIG: { [subject: string]: { [blockName: string]: string[]
   }
 };
 
+export const SUBTASKS_CONFIG: { [subject: string]: { [taskName: string]: string[] } } = {
+  'Математика': {
+    'Задание 13': ['13 (а)', '13 (б)'],
+    'Задание 14': ['14 (а)', '14 (б)'],
+    'Задание 15': ['15 (а)', '15 (б)'],
+    'Задание 17': ['17 (а)', '17 (б)'],
+    'Задание 18': ['18 (а)', '18 (б)'],
+    'Задание 19': ['19 (а)', '19 (б)', '19 (в)']
+  }
+};
+
 export function isBlockTask(subject: string, taskType: string): boolean {
-  return !!(BLOCKS_CONFIG[subject] && BLOCKS_CONFIG[subject][taskType]);
+  return !!(BLOCKS_CONFIG[subject]?.[taskType]) || !!(SUBTASKS_CONFIG[subject]?.[taskType]);
 }
 
-export function getBlockSubtasks(subject: string, blockName: string): string[] {
-  return BLOCKS_CONFIG[subject]?.[blockName] || [];
+export function getBlockSubtasks(subject: string, taskType: string): string[] {
+  return BLOCKS_CONFIG[subject]?.[taskType] || SUBTASKS_CONFIG[subject]?.[taskType] || [];
 }
 
 export function getTaskTypes(subject: Subject): string[] {

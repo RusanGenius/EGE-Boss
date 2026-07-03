@@ -10,8 +10,7 @@ const DEFAULT_ACTIVE_SESSION: ActiveSession = {
   targetInput: '10',
   elapsedSeconds: 0,
   startTime: null,
-  answers: [],
-  timerMode: 'default'
+  answers: []
 };
 
 interface AppContextType {
@@ -154,7 +153,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         activeSubjects: ['Математика', 'Русский язык', 'Информатика', 'Физика'],
         syncCode: '------',
         syncCodeCreatedAt: undefined,
-        theme: 'green'
+        theme: 'green',
+        timerMode: 'default'
       },
       activeTab: 'focus'
     };
@@ -168,7 +168,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let finalTaskType = tType;
     let initialCorrectness: { [subtask: string]: boolean | null } | undefined = undefined;
 
-    // Check if the selected task is a block, or if it belongs to a block
+    // Check if the selected task is a block
     const allBlocksForSubject = BLOCKS_CONFIG[subj];
     if (allBlocksForSubject) {
       if (allBlocksForSubject[tType]) {
@@ -181,13 +181,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           finalTaskType = parentBlock;
         }
       }
-      
-      if (allBlocksForSubject[finalTaskType]) {
-        initialCorrectness = {};
-        allBlocksForSubject[finalTaskType].forEach(sub => {
-          initialCorrectness![sub] = null;
-        });
-      }
+    }
+
+    const subtasks = getBlockSubtasks(subj, finalTaskType);
+    if (subtasks.length > 0) {
+      initialCorrectness = {};
+      subtasks.forEach(sub => {
+        initialCorrectness![sub] = null;
+      });
     }
 
     setActiveSession({
@@ -198,7 +199,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       elapsedSeconds: 0,
       startTime: Date.now(),
       answers: [],
-      timerMode: 'default',
       compositeCorrectness: initialCorrectness
     });
   };
@@ -318,10 +318,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const setTimerMode = (mode: TimerModeType) => {
-    setActiveSession(prev => ({
-      ...prev,
-      timerMode: mode
-    }));
+    updateSettings({ timerMode: mode });
   };
 
   const addMockExam = (exam: Omit<MockExam, 'id'>) => {
