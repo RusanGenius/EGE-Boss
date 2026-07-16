@@ -89,6 +89,8 @@ export function FocusScreen() {
   const { 
     state, 
     activeSession,
+    isFullscreen,
+    setIsFullscreen,
     startSession,
     pauseSession,
     resumeSession,
@@ -233,19 +235,8 @@ export function FocusScreen() {
   };
 
   // Fullscreen support state & logic for mobile
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFullscreenBtn, setShowFullscreenBtn] = useState(true);
   const fullscreenBtnTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    const onFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener('fullscreenchange', onFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', onFullscreenChange);
-    };
-  }, []);
 
   const handleScreenTap = () => {
     setShowFullscreenBtn(true);
@@ -276,12 +267,24 @@ export function FocusScreen() {
 
   const toggleFullscreen = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch((err) => {
-        console.error(`Error attempting to enable fullscreen: ${err.message}`);
-      });
+    const targetState = !isFullscreen;
+    
+    // Toggle the shared store state immediately (this guarantees UI adjustments will work everywhere!)
+    setIsFullscreen(targetState);
+    
+    // Try to trigger real native browser fullscreen as progressive enhancement
+    if (targetState) {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch((err) => {
+          console.warn(`Native fullscreen not supported or blocked: ${err.message}`);
+        });
+      }
     } else {
-      document.exitFullscreen();
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch((err) => {
+          console.warn(`Error exiting native fullscreen: ${err.message}`);
+        });
+      }
     }
   };
 

@@ -5,13 +5,12 @@ import { cn } from '../utils';
 import { motion } from 'motion/react';
 
 export function Sidebar() {
-  const { state, setTab } = useApp();
+  const { state, setTab, isFullscreen } = useApp();
   const [isCollapsed, setIsCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebar-collapsed');
     return saved === 'true';
   });
   const [logoClicks, setLogoClicks] = useState<number[]>([]);
-  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const handleLogoClick = () => {
     const now = Date.now();
@@ -26,16 +25,6 @@ export function Sidebar() {
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', String(isCollapsed));
   }, [isCollapsed]);
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    };
-  }, []);
   
   const navItems = [
     { id: 'focus', icon: Target, label: 'Фокус' },

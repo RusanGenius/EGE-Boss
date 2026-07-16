@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AppState, Session, Settings, Plan, TabType, ActiveSession, TimerModeType, Subject, Answer, MockExam } from './types';
 import { INITIAL_STATE } from './seed';
-import { isBlockTask, getBlockSubtasks, BLOCKS_CONFIG } from './utils';
+import { isBlockTask, getBlockSubtasks, BLOCKS_CONFIG, getCompositeSessionStats } from './utils';
 
 const DEFAULT_ACTIVE_SESSION: ActiveSession = {
   focusState: 'setup',
@@ -16,6 +16,8 @@ const DEFAULT_ACTIVE_SESSION: ActiveSession = {
 interface AppContextType {
   state: AppState;
   activeSession: ActiveSession;
+  isFullscreen: boolean;
+  setIsFullscreen: (val: boolean) => void;
   setTab: (tab: TabType) => void;
   addSession: (session: Session) => void;
   deleteSession: (id: string) => void;
@@ -68,6 +70,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [tick, setTick] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('egeboss_data', JSON.stringify(state));
@@ -101,7 +104,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (plan.createdAt && sessionTime < plan.createdAt) return;
 
         if (session.taskType === plan.taskType) {
-          correctCount += session.answers.filter(a => a.isCorrect && (!plan.createdAt || (a.timestamp && a.timestamp >= plan.createdAt))).length;
+          const relevantAnswers = session.answers.filter(a => !plan.createdAt || (a.timestamp && a.timestamp >= plan.createdAt));
+          const { correctCount: compCorrect } = getCompositeSessionStats(session.subject, session.taskType, relevantAnswers);
+          correctCount += compCorrect;
         } else if (isBlock && subtasks.includes(session.taskType)) {
           correctCount += session.answers.filter(a => a.isCorrect && (!plan.createdAt || (a.timestamp && a.timestamp >= plan.createdAt))).length;
         } else {
@@ -217,6 +222,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setActiveSession(prev => {
       const newAnswers = [...prev.answers];
       const currentCorrectness = prev.compositeCorrectness || {};
+      const groupId = `composite_group_${Math.random().toString()}_${Date.now()}`;
       
       Object.keys(currentCorrectness).forEach(subtask => {
         const val = currentCorrectness[subtask];
@@ -225,7 +231,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             id: Math.random().toString(),
             isCorrect: val,
             timestamp: Date.now(),
-            taskType: subtask
+            taskType: subtask,
+            groupId: groupId
           });
         }
       });
@@ -371,6 +378,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     <AppContext.Provider value={{ 
       state, 
       activeSession,
+      isFullscreen,
+      setIsFullscreen,
       setTab, 
       addSession, 
       deleteSession, 

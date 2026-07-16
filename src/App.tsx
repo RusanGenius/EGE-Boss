@@ -16,9 +16,8 @@ import { useApp } from './store';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
-  const { state } = useApp();
+  const { state, isFullscreen, setIsFullscreen } = useApp();
   const isMonochrome = state.settings.theme === 'monochrome';
-  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -28,7 +27,7 @@ export default function App() {
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, []);
+  }, [setIsFullscreen]);
 
   return (
     <div className={`flex flex-col md:flex-row h-screen w-full bg-[#090909] text-[#fafafa] overflow-hidden font-sans ${isMonochrome ? 'selection:bg-white selection:text-[#090909]' : 'selection:bg-[#a3e635] selection:text-[#090909]'}`}>
