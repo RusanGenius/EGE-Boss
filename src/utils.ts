@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Subject } from './types';
+import { Subject, Answer } from './types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -84,4 +84,90 @@ export function getTaskTypes(subject: Subject): string[] {
   }
 
   return result;
+}
+
+export function getCompositeSessionStats(subject: string, taskType: string, answers: Answer[]) {
+  const isBlock = isBlockTask(subject, taskType);
+  if (!isBlock) {
+    const correctCount = answers.filter(a => a.isCorrect).length;
+    const errorCount = answers.filter(a => !a.isCorrect).length;
+    const markers = answers.map(a => ({ id: a.id, isCorrect: a.isCorrect }));
+    return { correctCount, errorCount, markers };
+  }
+
+  const subtasks = getBlockSubtasks(subject, taskType);
+  
+  const groups: { [key: string]: Answer[] } = {};
+  const standaloneAnswers: Answer[] = [];
+
+  answers.forEach(a => {
+    if (a.groupId) {
+      if (!groups[a.groupId]) {
+        groups[a.groupId] = [];
+      }
+      groups[a.groupId].push(a);
+    } else {
+      standaloneAnswers.push(a);
+    }
+  });
+
+  let correctCount = 0;
+  let errorCount = 0;
+  const markers: { id: string; isCorrect: boolean }[] = [];
+
+  Object.entries(groups).forEach(([groupId, groupAnswers]) => {
+    const allCorrect = subtasks.every(sub => {
+      const matchingAnswer = groupAnswers.find(ga => ga.taskType === sub);
+      return matchingAnswer && matchingAnswer.isCorrect;
+    });
+
+    if (allCorrect) {
+      correctCount++;
+      markers.push({ id: groupId, isCorrect: true });
+    } else {
+      errorCount++;
+      markers.push({ id: groupId, isCorrect: false });
+    }
+  });
+
+  if (standaloneAnswers.length > 0) {
+    const sorted = [...standaloneAnswers].sort((a, b) => a.timestamp - b.timestamp);
+    const timeGroups: Answer[][] = [];
+    let currentGroup: Answer[] = [];
+
+    sorted.forEach(a => {
+      if (currentGroup.length === 0) {
+        currentGroup.push(a);
+      } else {
+        const last = currentGroup[currentGroup.length - 1];
+        if (Math.abs(a.timestamp - last.timestamp) < 2000) {
+          currentGroup.push(a);
+        } else {
+          timeGroups.push(currentGroup);
+          currentGroup = [a];
+        }
+      }
+    });
+    if (currentGroup.length > 0) {
+      timeGroups.push(currentGroup);
+    }
+
+    timeGroups.forEach((group, idx) => {
+      const allCorrect = subtasks.every(sub => {
+        const matchingAnswer = group.find(ga => ga.taskType === sub);
+        return matchingAnswer && matchingAnswer.isCorrect;
+      });
+
+      const id = `standalone_group_${idx}_${group[0].timestamp}`;
+      if (allCorrect) {
+        correctCount++;
+        markers.push({ id, isCorrect: true });
+      } else {
+        errorCount++;
+        markers.push({ id, isCorrect: false });
+      }
+    });
+  }
+
+  return { correctCount, errorCount, markers };
 }
