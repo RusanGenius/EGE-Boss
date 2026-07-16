@@ -6,7 +6,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart
 import { format, subDays, parseISO, startOfDay, subMonths, startOfMonth, endOfMonth, getMonth } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { motion } from 'motion/react';
-import { getTaskTypes, isBlockTask, getBlockSubtasks } from '../utils';
+import { getTaskTypes, isBlockTask, getBlockSubtasks, getCompositeSessionStats } from '../utils';
 import { 
   ChevronLeft, 
   Trash2, 
@@ -145,8 +145,14 @@ function OverviewTab() {
   }, [state.sessions, subject, timeRange]);
 
   const totalTimeSeconds = filteredSessions.reduce((acc, s) => acc + s.durationSeconds, 0);
-  const totalCorrect = filteredSessions.reduce((acc, s) => acc + s.answers.filter(a => a.isCorrect).length, 0);
-  const totalErrors = filteredSessions.reduce((acc, s) => acc + s.answers.filter(a => !a.isCorrect).length, 0);
+  const totalCorrect = filteredSessions.reduce((acc, s) => {
+    const { correctCount } = getCompositeSessionStats(s.subject, s.taskType, s.answers);
+    return acc + correctCount;
+  }, 0);
+  const totalErrors = filteredSessions.reduce((acc, s) => {
+    const { errorCount } = getCompositeSessionStats(s.subject, s.taskType, s.answers);
+    return acc + errorCount;
+  }, 0);
 
   // Helper to get qualifying streak days (>= 25 min total per day)
   const getQualifyingStreakDays = (targetSubject: string): string[] => {
@@ -263,7 +269,10 @@ function OverviewTab() {
     } else if (timeRange === 'Год') {
       subjSessions = subjSessions.filter(s => parseISO(s.date).getTime() >= subDays(startOfDay(now), 365).getTime());
     }
-    const correct = subjSessions.reduce((acc, s) => acc + s.answers.filter(a => a.isCorrect).length, 0);
+    const correct = subjSessions.reduce((acc, s) => {
+      const { correctCount } = getCompositeSessionStats(s.subject, s.taskType, s.answers);
+      return acc + correctCount;
+    }, 0);
     return { subject: subj, value: correct };
   });
 
@@ -1068,7 +1077,7 @@ function TasksTab() {
         </button>
         <h2 className="text-2xl font-light text-[#fafafa] mb-8">{subject} <span className="text-[#717171]">{selectedTask}</span></h2>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card>
             <div className="text-[10px] text-[#717171] uppercase tracking-widest font-bold mb-2">Решено всего</div>
             <div className="text-3xl font-light text-[#fafafa] font-mono">{totalSolved}</div>
@@ -1080,10 +1089,6 @@ function TasksTab() {
           <Card>
             <div className="text-[10px] text-[#f43f5e] uppercase tracking-widest font-bold mb-2">Ошибок</div>
             <div className="text-3xl font-light text-[#f43f5e] font-mono">{errorCount}</div>
-          </Card>
-          <Card>
-            <div className="text-[10px] text-[#38bdf8] uppercase tracking-widest font-bold mb-2">Успешность</div>
-            <div className="text-3xl font-light text-[#38bdf8] font-mono">{successRate}%</div>
           </Card>
         </div>
 
@@ -1108,14 +1113,11 @@ function TasksTab() {
                 const subStats = getSubtaskStats(subName);
                 return (
                   <div key={subName} className="space-y-2">
-                    <div className="flex justify-between items-end">
-                      <div>
-                        <div className="text-sm font-bold text-[#fafafa]">{subName}</div>
-                        <div className="text-[10px] text-[#717171] font-bold uppercase mt-1">
-                          Решено: {subStats.totalSolved} (Верно: {subStats.correctCount}, Ошибок: {subStats.errorCount})
-                        </div>
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm font-medium text-[#fafafa]">{subName}</div>
+                      <div className="text-xs font-semibold text-[#717171] font-mono">
+                        {subStats.totalSolved} ({subStats.correctCount}✓, {subStats.errorCount}✗)
                       </div>
-                      <div className="text-sm font-bold text-[#38bdf8]">{subStats.successRate}%</div>
                     </div>
                     <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
                       <div className={`h-full ${progressBg} transition-all`} style={{ width: `${subStats.successRate}%` }} />
@@ -1127,21 +1129,20 @@ function TasksTab() {
           </Card>
         )}
 
-        <Card className="flex flex-col gap-6 bg-[#121214]">
-          <div className="text-[10px] text-[#717171] uppercase tracking-widest font-bold">Доля верных решений</div>
-          <div className="h-4 w-full flex rounded-full overflow-hidden bg-white/5">
+        <Card className="flex flex-col gap-4 bg-[#121214]">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] text-[#717171] uppercase tracking-widest font-bold">Доля верных решений</span>
+            <span className="text-xs font-medium text-[#717171] font-mono">({successRate}%)</span>
+          </div>
+          <div className="h-3 w-full flex rounded-full overflow-hidden bg-white/5">
             {totalSolved > 0 ? (
               <>
                 <div className={progressBg} style={{ width: `${successRate}%` }} />
-                <div className="bg-[#f43f5e]" style={{ width: `${100 - successRate}%` }} />
+                <div className="bg-white/10" style={{ width: `${100 - successRate}%` }} />
               </>
             ) : (
               <div className="bg-white/10 w-full" />
             )}
-          </div>
-          <div className="flex justify-between text-xs font-semibold">
-            <span className="text-[#a3e635]">✓ Верно ({successRate}%)</span>
-            <span className="text-[#f43f5e]">X Ошибки ({totalSolved > 0 ? 100 - successRate : 0}%)</span>
           </div>
         </Card>
       </div>
@@ -1179,9 +1180,9 @@ function TasksTab() {
           const { totalSolved, successRate } = getTaskStats(task);
           return (
             <button key={task} onClick={() => setSelectedTask(task)} className="text-left">
-              <Card className="hover:border-white/10 transition-colors cursor-pointer group">
-                <div className="text-sm font-bold text-[#fafafa] mb-1">{task}</div>
-                <div className="text-[10px] text-[#717171] font-bold uppercase mb-4">Всего решений: {totalSolved}</div>
+              <Card className="hover:border-white/10 transition-colors cursor-pointer group pb-3.5">
+                <div className="text-sm font-medium text-[#fafafa] mb-1">{task}</div>
+                <div className="text-[10px] text-[#717171] uppercase tracking-widest font-bold mb-3">Всего решений: {totalSolved}</div>
                 <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
                   <div className={`h-full ${progressBg} transition-all`} style={{ width: `${totalSolved > 0 ? successRate : 0}%` }} />
                 </div>

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play } from 'lucide-react';
+import { Play, Maximize, Minimize } from 'lucide-react';
 import { useApp } from '../store';
 import { Card, Button } from './ui';
 import { Subject } from '../types';
-import { cn, isBlockTask, getBlockSubtasks, getTaskTypes } from '../utils';
+import { cn, isBlockTask, getBlockSubtasks, getTaskTypes, getCompositeSessionStats } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 const CONFETTI_COLORS = ['#f43f5e', '#a3e635', '#38bdf8', '#fbbf24', '#ec4899', '#a855f7', '#10b981', '#f97316'];
@@ -209,11 +209,14 @@ export function FocusScreen() {
     finishSession();
   };
 
+  const { correctCount: activeCorrectCount, errorCount: activeErrorCount, markers: activeMarkers } = React.useMemo(() => {
+    return getCompositeSessionStats(activeSession.subject, activeSession.taskType, activeSession.answers);
+  }, [activeSession.subject, activeSession.taskType, activeSession.answers]);
+
   const handleSaveSession = () => {
     const targetCountVal = parseInt(activeSession.targetInput, 10);
     const hasTargetVal = !isNaN(targetCountVal) && targetCountVal > 0;
-    const activeCorrectCountVal = activeSession.answers.filter(a => a.isCorrect).length;
-    const isTargetAchieved = hasTargetVal && activeCorrectCountVal >= targetCountVal;
+    const isTargetAchieved = hasTargetVal && activeCorrectCount >= targetCountVal;
 
     saveSession();
 
@@ -229,6 +232,59 @@ export function FocusScreen() {
     discardSession();
   };
 
+  // Fullscreen support state & logic for mobile
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showFullscreenBtn, setShowFullscreenBtn] = useState(true);
+  const fullscreenBtnTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+    };
+  }, []);
+
+  const handleScreenTap = () => {
+    setShowFullscreenBtn(true);
+    if (fullscreenBtnTimerRef.current) {
+      clearTimeout(fullscreenBtnTimerRef.current);
+    }
+    fullscreenBtnTimerRef.current = setTimeout(() => {
+      setShowFullscreenBtn(false);
+    }, 3000);
+  };
+
+  useEffect(() => {
+    if (activeSession.focusState === 'active') {
+      setShowFullscreenBtn(true);
+      if (fullscreenBtnTimerRef.current) {
+        clearTimeout(fullscreenBtnTimerRef.current);
+      }
+      fullscreenBtnTimerRef.current = setTimeout(() => {
+        setShowFullscreenBtn(false);
+      }, 3000);
+    }
+    return () => {
+      if (fullscreenBtnTimerRef.current) {
+        clearTimeout(fullscreenBtnTimerRef.current);
+      }
+    };
+  }, [activeSession.focusState]);
+
+  const toggleFullscreen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
   // Helper to format any seconds amount
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -239,9 +295,6 @@ export function FocusScreen() {
   // Live seconds calculation
   const currentSeconds = activeSession.elapsedSeconds + 
     (activeSession.startTime ? Math.floor((Date.now() - activeSession.startTime) / 1000) : 0);
-
-  const activeCorrectCount = activeSession.answers.filter(a => a.isCorrect).length;
-  const activeErrorCount = activeSession.answers.filter(a => !a.isCorrect).length;
 
   const targetCount = parseInt(activeSession.targetInput, 10);
   const hasTarget = !isNaN(targetCount) && targetCount > 0;
@@ -321,8 +374,25 @@ export function FocusScreen() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
+            onClick={handleScreenTap}
             className="flex-1 flex flex-col items-center justify-center p-8 relative w-full h-full"
           >
+            {/* Minimalist Fullscreen Toggle Button for Mobile Devices */}
+            <AnimatePresence>
+              {showFullscreenBtn && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.2 }}
+                  onClick={toggleFullscreen}
+                  className="md:hidden absolute top-4 right-4 z-40 p-2.5 rounded-full bg-white/5 border border-white/10 text-[#717171] hover:text-[#fafafa] active:scale-95 transition-all outline-none focus:outline-none"
+                  aria-label="Toggle Fullscreen"
+                >
+                  {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+                </motion.button>
+              )}
+            </AnimatePresence>
             <div
               style={{
                 transform: `translate(${burnShift.x}px, ${burnShift.y}px)`,
@@ -384,13 +454,13 @@ export function FocusScreen() {
                 {!state.settings.hideTaskMarkers && (
                   <div className="w-full overflow-hidden flex justify-center mb-12 h-3 px-2">
                     <div className="flex gap-2 justify-center items-center max-w-full">
-                      {activeSession.answers.slice(-16).map((a, i) => (
+                      {activeMarkers.slice(-16).map((m, i) => (
                         <motion.div 
-                          key={a.id || i} 
+                          key={m.id || i} 
                           initial={{ scale: 0, opacity: 0 }}
                           animate={{ scale: 1, opacity: 1 }}
                           transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                          className={`w-3 h-3 rounded-full shrink-0 ${a.isCorrect ? 'bg-[#a3e635]' : 'bg-[#f43f5e]'}`}
+                          className={`w-3 h-3 rounded-full shrink-0 ${m.isCorrect ? 'bg-[#a3e635]' : 'bg-[#f43f5e]'}`}
                         />
                       ))}
                     </div>
