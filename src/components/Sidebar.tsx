@@ -11,6 +11,7 @@ export function Sidebar() {
     return saved === 'true';
   });
   const [logoClicks, setLogoClicks] = useState<number[]>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const handleLogoClick = () => {
     const now = Date.now();
@@ -25,6 +26,16 @@ export function Sidebar() {
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', String(isCollapsed));
   }, [isCollapsed]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
   
   const navItems = [
     { id: 'focus', icon: Target, label: 'Фокус' },
@@ -116,7 +127,10 @@ export function Sidebar() {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <div className="flex md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#111112] border-t border-white/5 z-50 justify-around items-center px-4">
+      <div className={cn(
+        "flex md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#111112] border-t border-white/5 z-50 justify-around items-center px-4 transition-all duration-300",
+        isFullscreen && "translate-y-full opacity-0 pointer-events-none"
+      )}>
         {navItems.map((item) => {
           const isActive = state.activeTab === item.id;
           const Icon = item.icon;
