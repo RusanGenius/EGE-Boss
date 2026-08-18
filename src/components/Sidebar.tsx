@@ -5,7 +5,7 @@ import { cn } from '../utils';
 import { motion } from 'motion/react';
 
 export function Sidebar() {
-  const { state, setTab } = useApp();
+  const { state, setTab, isFullscreen } = useApp();
   const [isCollapsed, setIsCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebar-collapsed');
     return saved === 'true';
@@ -89,21 +89,26 @@ export function Sidebar() {
                 className={cn(
                   "w-full flex items-center p-3 rounded-xl transition-all text-sm relative group text-left focus:outline-none outline-none select-none",
                   isCollapsed ? "justify-center" : "gap-3",
-                  isActive 
-                    ? "bg-white/5 text-[#fafafa]" 
-                    : "text-[#717171] hover:text-[#fafafa]"
+                  isActive ? "text-[#fafafa]" : "text-[#717171] hover:text-[#fafafa]"
                 )}
                 title={isCollapsed ? item.label : undefined}
               >
                 {isActive && (
                   <motion.div 
-                    layoutId="active-nav-indicator-desktop"
+                    layoutId="active-nav-bg-desktop"
                     transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                    className="absolute left-0 w-1 h-4 bg-white rounded-full"
+                    className="absolute inset-0 bg-white/5 rounded-xl"
                   />
                 )}
-                <Icon size={20} className={isActive ? "text-[#fafafa]" : "text-[#717171] group-hover:text-[#fafafa]"} />
-                {!isCollapsed && <span className="font-medium">{item.label}</span>}
+                {isActive && (
+                  <motion.div 
+                    layoutId="active-nav-indicator-desktop"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    className="absolute left-0 w-1 h-4 bg-white rounded-full z-10"
+                  />
+                )}
+                <Icon size={20} className={cn("relative z-10", isActive ? "text-[#fafafa]" : "text-[#717171] group-hover:text-[#fafafa]")} />
+                {!isCollapsed && <span className="font-medium relative z-10">{item.label}</span>}
               </button>
             );
           })}
@@ -111,7 +116,10 @@ export function Sidebar() {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <div className="flex md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#111112] border-t border-white/5 z-50 justify-around items-center px-4">
+      <div className={cn(
+        "flex md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#111112] border-t border-white/5 z-50 justify-around items-center px-4 transition-all duration-300",
+        isFullscreen && "translate-y-full opacity-0 pointer-events-none"
+      )}>
         {navItems.map((item) => {
           const isActive = state.activeTab === item.id;
           const Icon = item.icon;
