@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Ege Boss",
+  "description": "Трекер подготовки к ЕГЭ",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

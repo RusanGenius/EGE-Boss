@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AppState, Session, Settings, Plan, TabType, ActiveSession, TimerModeType, Subject, Answer, MockExam } from './types';
 import { INITIAL_STATE } from './seed';
-import { isBlockTask, getBlockSubtasks, BLOCKS_CONFIG } from './utils';
+import { isBlockTask, getBlockSubtasks, BLOCKS_CONFIG, getCompositeSessionStats } from './utils';
 
 const DEFAULT_ACTIVE_SESSION: ActiveSession = {
   focusState: 'setup',
@@ -10,14 +10,23 @@ const DEFAULT_ACTIVE_SESSION: ActiveSession = {
   targetInput: '10',
   elapsedSeconds: 0,
   startTime: null,
-  answers: [],
-  timerMode: 'default'
+  answers: []
 };
 
 interface AppContextType {
   state: AppState;
   activeSession: ActiveSession;
+  isFullscreen: boolean;
+  setIsFullscreen: (val: boolean) => void;
   setTab: (tab: TabType) => void;
+  statsSubTab: 'overview' | 'achievements' | 'mocks' | 'tasks';
+  setStatsSubTab: (tab: 'overview' | 'achievements' | 'mocks' | 'tasks') => void;
+  mocksSelectedSubject: Subject | null;
+  setMocksSelectedSubject: (subject: Subject | null) => void;
+  mockExamPrompt: { show: boolean; subject: Subject; id: number } | null;
+  showMockExamPrompt: (subject: Subject) => void;
+  hideMockExamPrompt: () => void;
+  navigateToMocks: (subject: Subject) => void;
   addSession: (session: Session) => void;
   deleteSession: (id: string) => void;
   updateSettings: (settings: Partial<Settings>) => void;
@@ -69,6 +78,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [tick, setTick] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [statsSubTab, setStatsSubTab] = useState<'overview' | 'achievements' | 'mocks' | 'tasks'>('overview');
+  const [mocksSelectedSubject, setMocksSelectedSubject] = useState<Subject | null>(null);
+  const [mockExamPrompt, setMockExamPrompt] = useState<{ show: boolean; subject: Subject; id: number } | null>(null);
+
+  const showMockExamPrompt = (subject: Subject) => {
+    setMockExamPrompt({
+      show: true,
+      subject,
+      id: Date.now()
+    });
+  };
+
+  const hideMockExamPrompt = () => {
+    setMockExamPrompt(null);
+  };
+
+  const navigateToMocks = (subject: Subject) => {
+    setMocksSelectedSubject(subject);
+    setStatsSubTab('mocks');
+    setState(s => ({ ...s, activeTab: 'stats' }));
+    setMockExamPrompt(null);
+  };
 
   useEffect(() => {
     localStorage.setItem('egeboss_data', JSON.stringify(state));
@@ -102,7 +134,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (plan.createdAt && sessionTime < plan.createdAt) return;
 
         if (session.taskType === plan.taskType) {
-          correctCount += session.answers.filter(a => a.isCorrect && (!plan.createdAt || (a.timestamp && a.timestamp >= plan.createdAt))).length;
+          const relevantAnswers = session.answers.filter(a => !plan.createdAt || (a.timestamp && a.timestamp >= plan.createdAt));
+          const { correctCount: compCorrect } = getCompositeSessionStats(session.subject, session.taskType, relevantAnswers);
+          correctCount += compCorrect;
         } else if (isBlock && subtasks.includes(session.taskType)) {
           correctCount += session.answers.filter(a => a.isCorrect && (!plan.createdAt || (a.timestamp && a.timestamp >= plan.createdAt))).length;
         } else {
@@ -154,7 +188,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         activeSubjects: ['Математика', 'Русский язык', 'Информатика', 'Физика'],
         syncCode: '------',
         syncCodeCreatedAt: undefined,
-        theme: 'green'
+        theme: 'green',
+        timerMode: 'default'
       },
       activeTab: 'focus'
     };
@@ -168,7 +203,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let finalTaskType = tType;
     let initialCorrectness: { [subtask: string]: boolean | null } | undefined = undefined;
 
-    // Check if the selected task is a block, or if it belongs to a block
+    // Check if the selected task is a block
     const allBlocksForSubject = BLOCKS_CONFIG[subj];
     if (allBlocksForSubject) {
       if (allBlocksForSubject[tType]) {
@@ -181,13 +216,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           finalTaskType = parentBlock;
         }
       }
-      
-      if (allBlocksForSubject[finalTaskType]) {
-        initialCorrectness = {};
-        allBlocksForSubject[finalTaskType].forEach(sub => {
-          initialCorrectness![sub] = null;
-        });
-      }
+    }
+
+    const subtasks = getBlockSubtasks(subj, finalTaskType);
+    if (subtasks.length > 0) {
+      initialCorrectness = {};
+      subtasks.forEach(sub => {
+        initialCorrectness![sub] = null;
+      });
     }
 
     setActiveSession({
@@ -198,7 +234,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       elapsedSeconds: 0,
       startTime: Date.now(),
       answers: [],
-      timerMode: 'default',
       compositeCorrectness: initialCorrectness
     });
   };
@@ -217,6 +252,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setActiveSession(prev => {
       const newAnswers = [...prev.answers];
       const currentCorrectness = prev.compositeCorrectness || {};
+      const groupId = `composite_group_${Math.random().toString()}_${Date.now()}`;
       
       Object.keys(currentCorrectness).forEach(subtask => {
         const val = currentCorrectness[subtask];
@@ -225,7 +261,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             id: Math.random().toString(),
             isCorrect: val,
             timestamp: Date.now(),
-            taskType: subtask
+            taskType: subtask,
+            groupId: groupId
           });
         }
       });
@@ -318,10 +355,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const setTimerMode = (mode: TimerModeType) => {
-    setActiveSession(prev => ({
-      ...prev,
-      timerMode: mode
-    }));
+    updateSettings({ timerMode: mode });
   };
 
   const addMockExam = (exam: Omit<MockExam, 'id'>) => {
@@ -374,7 +408,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     <AppContext.Provider value={{ 
       state, 
       activeSession,
+      isFullscreen,
+      setIsFullscreen,
       setTab, 
+      statsSubTab,
+      setStatsSubTab,
+      mocksSelectedSubject,
+      setMocksSelectedSubject,
+      mockExamPrompt,
+      showMockExamPrompt,
+      hideMockExamPrompt,
+      navigateToMocks,
       addSession, 
       deleteSession, 
       updateSettings, 

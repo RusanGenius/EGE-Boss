@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play } from 'lucide-react';
+import { Play, Maximize, Minimize } from 'lucide-react';
 import { useApp } from '../store';
 import { Card, Button } from './ui';
 import { Subject } from '../types';
-import { cn, isBlockTask, getBlockSubtasks, getTaskTypes } from '../utils';
+import { cn, isBlockTask, getBlockSubtasks, getTaskTypes, getCompositeSessionStats } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 const CONFETTI_COLORS = ['#f43f5e', '#a3e635', '#38bdf8', '#fbbf24', '#ec4899', '#a855f7', '#10b981', '#f97316'];
@@ -89,6 +89,8 @@ export function FocusScreen() {
   const { 
     state, 
     activeSession,
+    isFullscreen,
+    setIsFullscreen,
     startSession,
     pauseSession,
     resumeSession,
@@ -97,19 +99,20 @@ export function FocusScreen() {
     finishSession,
     saveSession,
     discardSession,
-    setTimerMode,
     setCompositeCorrectness,
-    addCompositeRoundAnswers
+    addCompositeRoundAnswers,
+    showMockExamPrompt,
+    navigateToMocks
   } = useApp();
 
   // Local setup states
   const [subject, setSubject] = useState<Subject>(activeSession.subject || 'Математика');
-  const [taskType, setTaskType] = useState(activeSession.taskType || 'Задание 1');
+  const [taskType, setTaskType] = useState(activeSession.taskType || 'Все задания');
   const [targetInput, setTargetInput] = useState(activeSession.targetInput || '10');
 
-  // Dynamically update available task types when subject changes
+  // Dynamically update available task types when subject changes (includes 'Все задания')
   const availableTaskTypes = React.useMemo(() => {
-    return getTaskTypes(subject);
+    return getTaskTypes(subject, true);
   }, [subject]);
 
   useEffect(() => {
@@ -210,12 +213,26 @@ export function FocusScreen() {
     finishSession();
   };
 
-  const handleSaveSession = () => {
-    const targetCountVal = parseInt(activeSession.targetInput, 10);
-    const hasTargetVal = !isNaN(targetCountVal) && targetCountVal > 0;
-    const activeCorrectCountVal = activeSession.answers.filter(a => a.isCorrect).length;
-    const isTargetAchieved = hasTargetVal && activeCorrectCountVal >= targetCountVal;
+  const { correctCount: activeCorrectCount, errorCount: activeErrorCount, markers: activeMarkers } = React.useMemo(() => {
+    return getCompositeSessionStats(activeSession.subject, activeSession.taskType, activeSession.answers);
+  }, [activeSession.subject, activeSession.taskType, activeSession.answers]);
 
+  const handleSaveSession = () => {
+    const isAllTasks = activeSession.taskType === 'Все задания';
+    let isTargetAchieved = false;
+
+    if (isAllTasks) {
+      const targetMinutes = parseInt(activeSession.targetInput, 10);
+      const hasTargetVal = !isNaN(targetMinutes) && targetMinutes > 0;
+      const targetSeconds = targetMinutes * 60;
+      isTargetAchieved = hasTargetVal && activeSession.elapsedSeconds <= targetSeconds && activeSession.elapsedSeconds > 0;
+    } else {
+      const targetCountVal = parseInt(activeSession.targetInput, 10);
+      const hasTargetVal = !isNaN(targetCountVal) && targetCountVal > 0;
+      isTargetAchieved = hasTargetVal && activeCorrectCount >= targetCountVal;
+    }
+
+    const sessionSubject = activeSession.subject;
     saveSession();
 
     if (isTargetAchieved) {
@@ -224,19 +241,67 @@ export function FocusScreen() {
         setShowConfetti(false);
       }, 12000);
     }
+
+    if (isAllTasks) {
+      showMockExamPrompt(sessionSubject);
+    }
   };
 
   const handleDiscardSession = () => {
     discardSession();
   };
 
-  const cycleTimerMode = () => {
-    if (activeSession.timerMode === 'default') {
-      setTimerMode('onlyMinutes');
-    } else if (activeSession.timerMode === 'onlyMinutes') {
-      setTimerMode('currentTime');
+  // Fullscreen support state & logic for mobile
+  const [showFullscreenBtn, setShowFullscreenBtn] = useState(true);
+  const fullscreenBtnTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleScreenTap = () => {
+    setShowFullscreenBtn(true);
+    if (fullscreenBtnTimerRef.current) {
+      clearTimeout(fullscreenBtnTimerRef.current);
+    }
+    fullscreenBtnTimerRef.current = setTimeout(() => {
+      setShowFullscreenBtn(false);
+    }, 3000);
+  };
+
+  useEffect(() => {
+    if (activeSession.focusState === 'active') {
+      setShowFullscreenBtn(true);
+      if (fullscreenBtnTimerRef.current) {
+        clearTimeout(fullscreenBtnTimerRef.current);
+      }
+      fullscreenBtnTimerRef.current = setTimeout(() => {
+        setShowFullscreenBtn(false);
+      }, 3000);
+    }
+    return () => {
+      if (fullscreenBtnTimerRef.current) {
+        clearTimeout(fullscreenBtnTimerRef.current);
+      }
+    };
+  }, [activeSession.focusState]);
+
+  const toggleFullscreen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const targetState = !isFullscreen;
+    
+    // Toggle the shared store state immediately (this guarantees UI adjustments will work everywhere!)
+    setIsFullscreen(targetState);
+    
+    // Try to trigger real native browser fullscreen as progressive enhancement
+    if (targetState) {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch((err) => {
+          console.warn(`Native fullscreen not supported or blocked: ${err.message}`);
+        });
+      }
     } else {
-      setTimerMode('default');
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch((err) => {
+          console.warn(`Error exiting native fullscreen: ${err.message}`);
+        });
+      }
     }
   };
 
@@ -251,11 +316,13 @@ export function FocusScreen() {
   const currentSeconds = activeSession.elapsedSeconds + 
     (activeSession.startTime ? Math.floor((Date.now() - activeSession.startTime) / 1000) : 0);
 
-  const activeCorrectCount = activeSession.answers.filter(a => a.isCorrect).length;
-  const activeErrorCount = activeSession.answers.filter(a => !a.isCorrect).length;
-
+  const isAllTasksSession = activeSession.taskType === 'Все задания';
   const targetCount = parseInt(activeSession.targetInput, 10);
   const hasTarget = !isNaN(targetCount) && targetCount > 0;
+  const targetMinutes = parseInt(activeSession.targetInput, 10);
+  const hasTargetMinutes = !isNaN(targetMinutes) && targetMinutes > 0;
+  const targetSeconds = targetMinutes * 60;
+  const remainingSeconds = Math.max(0, targetSeconds - currentSeconds);
 
   return (
     <AnimatePresence mode="wait">
@@ -300,12 +367,14 @@ export function FocusScreen() {
               </div>
 
               <div className="space-y-3">
-                <label className="text-xs font-bold text-[#717171] uppercase tracking-widest text-center block">Цель</label>
+                <label className="text-xs font-bold text-[#717171] uppercase tracking-widest text-center block">
+                  {taskType === 'Все задания' ? 'Цель (минуты)' : 'Цель'}
+                </label>
                 <input 
                   type="text" 
                   value={targetInput}
                   onChange={(e) => setTargetInput(e.target.value)}
-                  placeholder="Без ограничений"
+                  placeholder={taskType === 'Все задания' ? 'Количество минут (например, 60)' : 'Без ограничений'}
                   className="w-full bg-[#111112] border border-white/10 text-[#fafafa] text-base rounded-2xl px-5 py-4 outline-none focus:border-white/30 transition-all text-center"
                 />
               </div>
@@ -332,8 +401,25 @@ export function FocusScreen() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
+            onClick={handleScreenTap}
             className="flex-1 flex flex-col items-center justify-center p-8 relative w-full h-full"
           >
+            {/* Minimalist Fullscreen Toggle Button for Mobile Devices */}
+            <AnimatePresence>
+              {showFullscreenBtn && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.2 }}
+                  onClick={toggleFullscreen}
+                  className="md:hidden absolute top-4 right-4 z-40 p-2.5 rounded-full bg-white/5 border border-white/10 text-[#717171] hover:text-[#fafafa] active:scale-95 transition-all outline-none focus:outline-none"
+                  aria-label="Toggle Fullscreen"
+                >
+                  {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+                </motion.button>
+              )}
+            </AnimatePresence>
             <div
               style={{
                 transform: `translate(${burnShift.x}px, ${burnShift.y}px)`,
@@ -350,166 +436,217 @@ export function FocusScreen() {
                 
                 {!state.settings.hideTimer && (
                   <button 
-                    onClick={cycleTimerMode}
-                    className="text-[120px] leading-none font-sans font-extralight text-[#fafafa] tracking-tight mb-8 tabular-nums flex items-center justify-center select-none cursor-pointer hover:opacity-85 active:scale-98 transition-all"
+                    onClick={() => {
+                      if (activeSession.startTime === null) {
+                        resumeSession();
+                      } else {
+                        pauseSession();
+                      }
+                    }}
+                    className={cn(
+                      "text-[120px] leading-none font-sans font-extralight tracking-tight mb-8 tabular-nums flex items-center justify-center select-none cursor-pointer hover:opacity-85 active:scale-98 transition-all",
+                      activeSession.startTime === null ? "text-[#fafafa]/50 animate-pulse" : "text-[#fafafa]"
+                    )}
                   >
-                    {activeSession.timerMode === 'onlyMinutes' ? (
+                    {state.settings.timerMode === 'onlyMinutes' ? (
                       <span>{mStr}</span>
-                    ) : activeSession.timerMode === 'currentTime' ? (() => {
+                    ) : state.settings.timerMode === 'currentTime' ? (() => {
                       const now = new Date();
                       const hours = now.getHours();
                       const mins = now.getMinutes().toString().padStart(2, '0');
                       return (
                         <>
                           <span>{hours}</span>
-                          <span className="text-[#fafafa]/40 px-2 flex items-center justify-center relative -top-[12px] font-sans select-none">:</span>
+                          <span className={cn(
+                            "px-2 flex items-center justify-center relative -top-[12px] font-sans select-none",
+                            activeSession.startTime === null ? "text-[#fafafa]/20" : "text-[#fafafa]/40"
+                          )}>:</span>
                           <span>{mins}</span>
                         </>
                       );
                     })() : (
                       <>
                         <span>{mStr}</span>
-                        <span className="text-[#fafafa]/40 px-2 flex items-center justify-center relative -top-[12px] font-sans select-none">:</span>
+                        <span className={cn(
+                          "px-2 flex items-center justify-center relative -top-[12px] font-sans select-none",
+                          activeSession.startTime === null ? "text-[#fafafa]/20" : "text-[#fafafa]/40"
+                        )}>:</span>
                         <span>{sStr}</span>
                       </>
                     )}
                   </button>
                 )}
 
-                {/* Hide task circles when hideTaskMarkers setting is enabled */}
-                {!state.settings.hideTaskMarkers && (
+                {/* Hide task circles for 'Все задания' and when hideTaskMarkers setting is enabled */}
+                {!isAllTasksSession && !state.settings.hideTaskMarkers && (
                   <div className="w-full overflow-hidden flex justify-center mb-12 h-3 px-2">
                     <div className="flex gap-2 justify-center items-center max-w-full">
-                      {activeSession.answers.slice(-16).map((a, i) => (
+                      {activeMarkers.slice(-16).map((m, i) => (
                         <motion.div 
-                          key={a.id || i} 
+                          key={m.id || i} 
                           initial={{ scale: 0, opacity: 0 }}
                           animate={{ scale: 1, opacity: 1 }}
                           transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                          className={`w-3 h-3 rounded-full shrink-0 ${a.isCorrect ? 'bg-[#a3e635]' : 'bg-[#f43f5e]'}`}
+                          className={`w-3 h-3 rounded-full shrink-0 ${m.isCorrect ? 'bg-[#a3e635]' : 'bg-[#f43f5e]'}`}
                         />
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Progress bar line matched precisely to screenshot */}
-                {hasTarget && (
-                  <div className="w-full mb-6">
-                    <div className="flex justify-end text-xs font-mono text-[#717171] mb-2 select-none">
-                      {activeCorrectCount} / {targetCount}
+                {/* Progress bar for 'Все задания' (time-based) or regular tasks (count-based) */}
+                {isAllTasksSession ? (
+                  hasTargetMinutes && (
+                    <div className="w-full mb-8">
+                      <div className="flex justify-between items-center text-xs font-mono text-[#717171] mb-2 select-none">
+                        <span>Цель: {targetMinutes} мин</span>
+                        <span>
+                          {currentSeconds <= targetSeconds 
+                            ? `Осталось: ${formatTime(remainingSeconds)}` 
+                            : `Время вышло (+${formatTime(currentSeconds - targetSeconds)})`}
+                        </span>
+                      </div>
+                      <div className="w-full h-[2px] bg-white/10 rounded-full overflow-hidden">
+                        <motion.div 
+                          className={cn(
+                            "h-full rounded-full transition-all duration-300",
+                            currentSeconds <= targetSeconds ? "bg-white/60" : "bg-[#f43f5e]"
+                          )}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min(100, (currentSeconds / targetSeconds) * 100)}%` }}
+                          transition={{ duration: 0.2 }}
+                        />
+                      </div>
                     </div>
-                    <div className="w-full h-[2px] bg-white/10 rounded-full overflow-hidden">
-                      <motion.div 
-                        className="h-full bg-white/60 rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(100, (activeCorrectCount / targetCount) * 100)}%` }}
-                        transition={{ duration: 0.2 }}
-                      />
+                  )
+                ) : (
+                  hasTarget && (
+                    <div className="w-full mb-6">
+                      <div className="flex justify-end text-xs font-mono text-[#717171] mb-2 select-none">
+                        {activeCorrectCount} / {targetCount}
+                      </div>
+                      <div className="w-full h-[2px] bg-white/10 rounded-full overflow-hidden">
+                        <motion.div 
+                          className="h-full bg-white/60 rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min(100, (activeCorrectCount / targetCount) * 100)}%` }}
+                          transition={{ duration: 0.2 }}
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )
                 )}
 
-                {/* Relative container for non-shifting layouts */}
-                <div className="w-full relative mb-16">
-                  {isBlockTask(activeSession.subject, activeSession.taskType) ? (
-                    <div className="space-y-5 w-full">
-                      <div className="bg-[#121214] border border-white/5 rounded-2xl p-5 space-y-4 shadow-xl">
-                        {getBlockSubtasks(activeSession.subject, activeSession.taskType).map((subtask) => {
-                          const isCorrect = activeSession.compositeCorrectness?.[subtask];
-                          
-                          return (
-                            <div key={subtask} className="flex items-center justify-between py-2 border-b border-white/[0.03] last:border-0">
-                              <span className="text-sm font-semibold text-[#fafafa]">{subtask}</span>
-                              <div className="flex gap-2.5">
-                                <button
-                                  onClick={() => setCompositeCorrectness(subtask, isCorrect === true ? null : true)}
-                                  className={cn(
-                                    "w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer font-bold border text-lg",
-                                    isCorrect === true
-                                      ? "bg-[#a3e635]/15 text-[#a3e635] border-[#a3e635]/30 shadow-[0_0_15px_rgba(163,230,53,0.15)]"
-                                      : "bg-white/5 text-[#717171] border-transparent hover:text-white"
-                                  )}
-                                >
-                                  ✓
-                                </button>
-                                <button
-                                  onClick={() => setCompositeCorrectness(subtask, isCorrect === false ? null : false)}
-                                  className={cn(
-                                    "w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer font-bold border text-lg",
-                                    isCorrect === false
-                                      ? "bg-[#f43f5e]/15 text-[#f43f5e] border-[#f43f5e]/30 shadow-[0_0_15px_rgba(244,63,94,0.15)]"
-                                      : "bg-white/5 text-[#717171] border-transparent hover:text-white"
-                                  )}
-                                >
-                                  X
-                                </button>
+                {/* Center interactive area */}
+                {isAllTasksSession ? (
+                  <div className="w-full flex items-center justify-center mb-16 min-h-[44px] select-none">
+                    {activeSession.startTime === null && (
+                      <span className="text-xs font-mono text-[#717171]/80 uppercase tracking-widest animate-pulse">
+                        Пауза
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-full relative mb-16">
+                    {isBlockTask(activeSession.subject, activeSession.taskType) ? (
+                      <div className="space-y-5 w-full">
+                        <div className="bg-[#121214] border border-white/5 rounded-2xl p-5 space-y-4 shadow-xl">
+                          {getBlockSubtasks(activeSession.subject, activeSession.taskType).map((subtask) => {
+                            const isCorrect = activeSession.compositeCorrectness?.[subtask];
+                            
+                            return (
+                              <div key={subtask} className="flex items-center justify-between py-2 border-b border-white/[0.03] last:border-0">
+                                <span className="text-sm font-semibold text-[#fafafa]">{subtask}</span>
+                                <div className="flex gap-2.5">
+                                  <button
+                                    onClick={() => setCompositeCorrectness(subtask, isCorrect === true ? null : true)}
+                                    className={cn(
+                                      "w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer font-bold border text-lg",
+                                      isCorrect === true
+                                        ? "bg-[#a3e635]/15 text-[#a3e635] border-[#a3e635]/30 shadow-[0_0_15px_rgba(163,230,53,0.15)]"
+                                        : "bg-white/5 text-[#717171] border-transparent hover:text-white"
+                                    )}
+                                  >
+                                    ✓
+                                  </button>
+                                  <button
+                                    onClick={() => setCompositeCorrectness(subtask, isCorrect === false ? null : false)}
+                                    className={cn(
+                                      "w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer font-bold border text-lg",
+                                      isCorrect === false
+                                        ? "bg-[#f43f5e]/15 text-[#f43f5e] border-[#f43f5e]/30 shadow-[0_0_15px_rgba(244,63,94,0.15)]"
+                                        : "bg-white/5 text-[#717171] border-transparent hover:text-white"
+                                    )}
+                                  >
+                                    X
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                            );
+                          })}
+                        </div>
 
-                      <Button 
-                        variant="white" 
-                        onClick={addCompositeRoundAnswers} 
-                        className="w-full py-4 text-base font-semibold rounded-full shadow-[0_4px_20px_rgba(255,255,255,0.12)]"
-                      >
-                        ГОТОВО
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="space-y-3 w-full">
-                        <button 
-                          onClick={() => handleAnswer(true)}
-                          className="success-btn w-full bg-[#a3e635]/10 border border-[#a3e635]/30 hover:border-[#a3e635] hover:bg-[#a3e635]/20 text-[#fafafa] py-4 px-6 rounded-2xl flex items-center justify-between transition-all cursor-pointer"
+                        <Button 
+                          variant="white" 
+                          onClick={addCompositeRoundAnswers} 
+                          className="w-full py-4 text-base font-semibold rounded-full shadow-[0_4px_20px_rgba(255,255,255,0.12)]"
                         >
-                          <span className="text-sm font-medium tracking-wider">ВЕРНО</span>
-                          <span className="text-lg font-mono">{activeCorrectCount}</span>
-                        </button>
-                        
-                        <button 
-                          onClick={() => handleAnswer(false)}
-                          className="error-btn w-full bg-[#f43f5e]/10 border border-[#f43f5e]/30 hover:border-[#f43f5e] hover:bg-[#f43f5e]/20 text-[#fafafa] py-4 px-6 rounded-2xl flex items-center justify-between transition-all cursor-pointer"
-                        >
-                          <span className="text-sm font-medium tracking-wider">ОШИБКА</span>
-                          <span className="text-lg font-mono">{activeErrorCount}</span>
-                        </button>
+                          ГОТОВО
+                        </Button>
                       </div>
-
-                      {/* Absolute overlay for error notes */}
-                      <AnimatePresence>
-                        {showCommentInput && (
-                          <motion.div 
-                            ref={commentRef}
-                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            transition={{ duration: 0.15, ease: 'easeOut' }}
-                            className="absolute top-[calc(100%+16px)] left-0 right-0 z-30"
+                    ) : (
+                      <>
+                        <div className="space-y-3 w-full">
+                          <button 
+                            onClick={() => handleAnswer(true)}
+                            className="success-btn w-full bg-[#a3e635]/10 border border-[#a3e635]/30 hover:border-[#a3e635] hover:bg-[#a3e635]/20 text-[#fafafa] py-4 px-6 rounded-2xl flex items-center justify-between transition-all cursor-pointer"
                           >
-                            <div className="p-4 bg-[#111112] border border-white/10 rounded-2xl flex flex-col gap-3 shadow-2xl shadow-black/80">
-                              <input
-                                autoFocus
-                                type="text"
-                                placeholder="Заметка к ошибке..."
-                                value={currentComment}
-                                onChange={e => setCurrentComment(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && handleSaveComment()}
-                                className="w-full bg-transparent text-[#fafafa] outline-none text-sm placeholder:text-[#555]"
-                              />
-                              <div className="flex justify-end gap-2">
-                                <Button variant="ghost" className="px-3 py-1.5 text-xs rounded-lg" onClick={handleCancelComment}>Отмена</Button>
-                                <Button variant="secondary" className="px-3 py-1.5 text-xs rounded-lg" onClick={handleSaveComment}>Сохранить</Button>
+                            <span className="text-sm font-medium tracking-wider">ВЕРНО</span>
+                            <span className="text-lg font-mono">{activeCorrectCount}</span>
+                          </button>
+                          
+                          <button 
+                            onClick={() => handleAnswer(false)}
+                            className="error-btn w-full bg-[#f43f5e]/10 border border-[#f43f5e]/30 hover:border-[#f43f5e] hover:bg-[#f43f5e]/20 text-[#fafafa] py-4 px-6 rounded-2xl flex items-center justify-between transition-all cursor-pointer"
+                          >
+                            <span className="text-sm font-medium tracking-wider">ОШИБКА</span>
+                            <span className="text-lg font-mono">{activeErrorCount}</span>
+                          </button>
+                        </div>
+
+                        {/* Absolute overlay for error notes */}
+                        <AnimatePresence>
+                          {showCommentInput && (
+                            <motion.div 
+                              ref={commentRef}
+                              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                              transition={{ duration: 0.15, ease: 'easeOut' }}
+                              className="absolute top-[calc(100%+16px)] left-0 right-0 z-30"
+                            >
+                              <div className="p-4 bg-[#111112] border border-white/10 rounded-2xl flex flex-col gap-3 shadow-2xl shadow-black/80">
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  placeholder="Заметка к ошибке..."
+                                  value={currentComment}
+                                  onChange={e => setCurrentComment(e.target.value)}
+                                  onKeyDown={e => e.key === 'Enter' && handleSaveComment()}
+                                  className="w-full bg-transparent text-[#fafafa] outline-none text-sm placeholder:text-[#555]"
+                                />
+                                <div className="flex justify-end gap-2">
+                                  <Button variant="ghost" className="px-3 py-1.5 text-xs rounded-lg" onClick={handleCancelComment}>Отмена</Button>
+                                  <Button variant="secondary" className="px-3 py-1.5 text-xs rounded-lg" onClick={handleSaveComment}>Сохранить</Button>
+                                </div>
                               </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </>
-                  )}
-                </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="absolute bottom-12 left-0 right-0 flex justify-center">
@@ -544,14 +681,33 @@ export function FocusScreen() {
                 <span className="text-base font-mono text-[#fafafa]">{formatTime(currentSeconds)}</span>
               </div>
               
-              <div className="flex justify-between items-center py-3 border-b border-white/5">
-                <span className="text-base text-[#717171]">Верно</span>
-                <span className="text-base font-mono text-[#fafafa]">{activeCorrectCount}</span>
-              </div>
-              <div className="flex justify-between items-center py-3 border-b border-white/5">
-                <span className="text-base text-[#717171]">Ошибки</span>
-                <span className="text-base font-mono text-[#fafafa]">{activeErrorCount}</span>
-              </div>
+              {isAllTasksSession ? (
+                hasTargetMinutes && (
+                  <>
+                    <div className="flex justify-between items-center py-3 border-b border-white/5">
+                      <span className="text-base text-[#717171]">План по времени</span>
+                      <span className="text-base font-mono text-[#fafafa]">{targetMinutes} мин</span>
+                    </div>
+                    <div className="flex justify-between items-center py-3 border-b border-white/5">
+                      <span className="text-base text-[#717171]">Результат</span>
+                      <span className={`text-base font-medium ${currentSeconds <= targetSeconds ? 'text-[#a3e635]' : 'text-[#f43f5e]'}`}>
+                        {currentSeconds <= targetSeconds ? 'Успели вовремя! 🎉' : `Сверх плана (+${formatTime(currentSeconds - targetSeconds)})`}
+                      </span>
+                    </div>
+                  </>
+                )
+              ) : (
+                <>
+                  <div className="flex justify-between items-center py-3 border-b border-white/5">
+                    <span className="text-base text-[#717171]">Верно</span>
+                    <span className="text-base font-mono text-[#fafafa]">{activeCorrectCount}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-3 border-b border-white/5">
+                    <span className="text-base text-[#717171]">Ошибки</span>
+                    <span className="text-base font-mono text-[#fafafa]">{activeErrorCount}</span>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="space-y-3.5">

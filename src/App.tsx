@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { FocusScreen } from './components/FocusScreen';
 import { StatsScreen } from './components/StatsScreen';
@@ -12,19 +12,31 @@ import { PlansScreen } from './components/PlansScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { AchievementNotifier } from './components/AchievementNotifier';
 import { RusanEasterEgg } from './components/RusanEasterEgg';
+import { MockExamPrompt } from './components/MockExamPrompt';
 import { useApp } from './store';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
-  const { state } = useApp();
+  const { state, isFullscreen, setIsFullscreen } = useApp();
   const isMonochrome = state.settings.theme === 'monochrome';
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [setIsFullscreen]);
 
   return (
     <div className={`flex flex-col md:flex-row h-screen w-full bg-[#090909] text-[#fafafa] overflow-hidden font-sans ${isMonochrome ? 'selection:bg-white selection:text-[#090909]' : 'selection:bg-[#a3e635] selection:text-[#090909]'}`}>
       <AchievementNotifier />
       <RusanEasterEgg />
+      <MockExamPrompt />
       <Sidebar />
-      <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#090909] pb-16 md:pb-0">
+      <main className={`flex-1 flex flex-col h-full overflow-hidden bg-[#090909] transition-all duration-300 ${isFullscreen ? 'pb-0' : 'pb-16'} md:pb-0`}>
         <AnimatePresence mode="wait">
           {state.activeTab === 'focus' && (
             <motion.div

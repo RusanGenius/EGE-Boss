@@ -5,7 +5,7 @@ import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Check, X, Clock, Trash2, ChevronLeft, ChevronDown } from 'lucide-react';
 import { Session } from '../types';
-import { isBlockTask } from '../utils';
+import { isBlockTask, getCompositeSessionStats } from '../utils';
 
 export function HistoryScreen() {
   const { state, deleteSession } = useApp();
@@ -20,9 +20,11 @@ export function HistoryScreen() {
   };
 
   if (selectedSession) {
-    const correctCount = selectedSession.answers.filter(a => a.isCorrect).length;
-    const errorCount = selectedSession.answers.filter(a => !a.isCorrect).length;
+    const isAllTasks = selectedSession.taskType === 'Все задания';
+    const { correctCount, errorCount } = getCompositeSessionStats(selectedSession.subject, selectedSession.taskType, selectedSession.answers);
     const dateStr = format(parseISO(selectedSession.date), 'dd MMMM yyyy • HH:mm', { locale: ru });
+    const minutes = Math.floor(selectedSession.durationSeconds / 60);
+    const seconds = selectedSession.durationSeconds % 60;
     
     return (
       <div className="flex-1 p-8 overflow-y-auto">
@@ -57,33 +59,42 @@ export function HistoryScreen() {
               <div className="text-lg font-light text-[#717171]">{dateStr}</div>
             </div>
 
-            <div className="grid grid-cols-2 gap-px bg-white/5 border border-white/5 rounded-2xl overflow-hidden mb-8">
-              <div className="bg-[#1c1c1c] p-6 text-center">
-                <div className="text-3xl font-light text-[#a3e635] mb-1">{correctCount}</div>
-                <div className="text-[10px] text-[#717171] uppercase tracking-widest">Верно</div>
+            {isAllTasks ? (
+              <div className="bg-[#1c1c1c] p-6 text-center rounded-2xl border border-white/5 mb-8">
+                <div className="text-3xl font-light text-[#fafafa] font-mono mb-1">{minutes}м {seconds.toString().padStart(2, '0')}с</div>
+                <div className="text-[10px] text-[#717171] uppercase tracking-widest">Длительность сессии</div>
               </div>
-              <div className="bg-[#1c1c1c] p-6 text-center">
-                <div className="text-3xl font-light text-[#f43f5e] mb-1">{errorCount}</div>
-                <div className="text-[10px] text-[#717171] uppercase tracking-widest">Ошибок</div>
-              </div>
-            </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-px bg-white/5 border border-white/5 rounded-2xl overflow-hidden mb-8">
+                  <div className="bg-[#1c1c1c] p-6 text-center">
+                    <div className="text-3xl font-light text-[#a3e635] mb-1">{correctCount}</div>
+                    <div className="text-[10px] text-[#717171] uppercase tracking-widest">Верно</div>
+                  </div>
+                  <div className="bg-[#1c1c1c] p-6 text-center">
+                    <div className="text-3xl font-light text-[#f43f5e] mb-1">{errorCount}</div>
+                    <div className="text-[10px] text-[#717171] uppercase tracking-widest">Ошибок</div>
+                  </div>
+                </div>
 
-            <div className="space-y-3 mb-8">
-              <h3 className="text-xs font-bold text-[#717171] uppercase tracking-widest">Результаты по ответам</h3>
-              <div className="flex flex-wrap gap-2.5">
-                {selectedSession.answers.map((a, i) => (
-                  <div 
-                    key={i}
-                    className={`w-3.5 h-3.5 rounded-full shrink-0 ${
-                      a.isCorrect 
-                        ? 'bg-[#a3e635] shadow-[0_0_8px_rgba(163,230,53,0.2)]' 
-                        : 'bg-[#f43f5e] shadow-[0_0_8px_rgba(244,63,94,0.2)]'
-                    }`}
-                    title={`${a.taskType || selectedSession.taskType}: ${a.isCorrect ? 'Верно' : 'Ошибка'}${a.comment ? ` — ${a.comment}` : ''}`}
-                  />
-                ))}
-              </div>
-            </div>
+                <div className="space-y-3 mb-8">
+                  <h3 className="text-xs font-bold text-[#717171] uppercase tracking-widest">Результаты по ответам</h3>
+                  <div className="flex flex-wrap gap-2.5">
+                    {selectedSession.answers.map((a, i) => (
+                      <div 
+                        key={i}
+                        className={`w-3.5 h-3.5 rounded-full shrink-0 ${
+                          a.isCorrect 
+                            ? 'bg-[#a3e635] shadow-[0_0_8px_rgba(163,230,53,0.2)]' 
+                            : 'bg-[#f43f5e] shadow-[0_0_8px_rgba(244,63,94,0.2)]'
+                        }`}
+                        title={`${a.taskType || selectedSession.taskType}: ${a.isCorrect ? 'Верно' : 'Ошибка'}${a.comment ? ` — ${a.comment}` : ''}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
             {selectedSession.answers.some(a => !a.isCorrect && a.comment) && (
               <div className="mt-8 pt-8 border-t border-white/5 space-y-4">
@@ -158,8 +169,8 @@ export function HistoryScreen() {
                 {!isCollapsed && (
                   <div className="space-y-2">
                     {sessions.map(session => {
-                      const correctCount = session.answers.filter(a => a.isCorrect).length;
-                      const errorCount = session.answers.filter(a => !a.isCorrect).length;
+                      const isAllTasks = session.taskType === 'Все задания';
+                      const { correctCount, errorCount } = getCompositeSessionStats(session.subject, session.taskType, session.answers);
                       const hasComments = session.answers.some(a => !a.isCorrect && a.comment);
                       
                       return (
@@ -178,8 +189,12 @@ export function HistoryScreen() {
                               </div>
                               <div className="flex items-center gap-4 text-sm font-medium text-[#717171]">
                                 <span className="flex items-center gap-1"><Clock size={14} /> {Math.floor(session.durationSeconds / 60)}:{(session.durationSeconds % 60).toString().padStart(2, '0')}</span>
-                                <span className="flex items-center gap-1 text-[#a3e635] font-semibold"><Check size={14} /> {correctCount}</span>
-                                <span className="flex items-center gap-1 text-[#f43f5e] font-semibold"><X size={14} /> {errorCount}</span>
+                                {!isAllTasks && (
+                                  <>
+                                    <span className="flex items-center gap-1 text-[#a3e635] font-semibold"><Check size={14} /> {correctCount}</span>
+                                    <span className="flex items-center gap-1 text-[#f43f5e] font-semibold"><X size={14} /> {errorCount}</span>
+                                  </>
+                                )}
                                 {hasComments && (
                                   <span className="w-1.5 h-1.5 rounded-full bg-[#717171] shrink-0" title="Есть комментарии к ошибкам" />
                                 )}
